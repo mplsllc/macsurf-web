@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Version history — MacSurf</title>
+<meta name="description" content="MacSurf version history and milestone timeline from v0.1 through current.">
+<link rel="canonical" href="https://macsurf.org/history.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html" class="active">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Milestones</div>
+    <h1>Version history</h1>
+    <p class="lede">The MacSurf timeline — milestone by milestone, from the first HTTP fetch over Open Transport to CSS Grid on a beige G3.</p>
+    <h2>The First ES5 JavaScript Engine on Classic Macintosh</h2>
+<p>On April 15, 2026, a Power Macintosh running Mac OS 9 executed a JavaScript program and displayed the result in a web browser window. The title bar read &quot;MacSurf - JS OK (1+1=2).&quot; It was the first time a modern ECMAScript engine had ever run on Classic Mac OS hardware.</p>
+<p>By the end of that same night, MacSurf was rendering ASCII Mandelbrot fractals computed entirely in JavaScript, sorting 5,000-element arrays via quicksort, evaluating the Ackermann function to depth 1,021, and parsing JSON — all inside a Carbon application on a machine from 1998.</p>
+<p>No consumer browser has ever done this before. Classic IE 5.x shipped JScript 5, but it predates ES5 and ran on Mac OS X, not Classic. Classilla attempted Mozilla's SpiderMonkey on OS 9 but JavaScript was its primary source of crashes and instability. MacSurf is the first browser to ship a stable, fully functional ES5 engine on this platform.</p>
+<hr />
+<h2>The Machine</h2>
+<p><strong>Power Macintosh G3 Minitower (Beige), Machine ID 510</strong></p>
+<ul>
+<li>Processor: PowerPC G4 at 400 MHz (Sonnet upgrade card — the beige G3 never shipped with a G4)</li>
+<li>RAM: 192 MB (32 MB + 32 MB + 128 MB DIMMs in slots J3/J4/J5)</li>
+<li>Video Memory: 6 MB</li>
+<li>External L2 Cache: Not installed</li>
+<li>Startup Drive: &quot;Back40&quot; (Internal ATA)</li>
+<li>OS: Mac OS 9.1 (US)</li>
+<li>CarbonLib: 1.6</li>
+<li>QuickTime: 6.0.3</li>
+<li>Virtual Memory: 193 MB (on Back40)</li>
+<li>Network: 10.42.0.204 via Ethernet built-in</li>
+<li>Compiler: Metrowerks CodeWarrior 8 Pro (8.3 update)</li>
+</ul>
+<p>This is Gary Hansen's machine with an aftermarket Sonnet G4 processor upgrade installed — a pretty sweet find. The Sonnet Processor Upgrade 1.4.5 extension is active in the System Folder. Every line of code was compiled on it. Every screenshot was captured from it. Every benchmark was measured on it. There is no emulator in this story. System profile generated live from the machine on April 15, 2026 at 8:47 PM.</p>
+<hr />
+<h2>The Technology Stack</h2>
+<p>MacSurf exists because of several remarkable pieces of technology, most of them older than the machine itself:</p>
+<h3>NetSurf (netsurf-browser.org)</h3>
+<p>The browser engine. An open-source web browser written in C with no external dependencies, designed for low-resource systems. NetSurf's clean architecture — with explicit support for cooperative multitasking and non-POSIX platforms via its frontend abstraction — made the port to Mac OS 9 possible. The RISC OS and AmigaOS frontends served as direct references. MacSurf links against all five NetSurf core libraries: libparserutils, libhubbub, libdom, libcss, and libwapcaplet — approximately 125,000 lines of C across 443 source files.</p>
+<h3>Duktape 2.7.0 (duktape.org)</h3>
+<p>The JavaScript engine. An embeddable ES5/ES5.1 interpreter written in portable C89 by Sami Vaarala. Duktape's single-file amalgamation (<code>duktape.c</code>, 3.6 MB) compiled under CodeWarrior 8's strict C89 mode with zero source patches to the engine itself — only configuration changes in <code>duk_config.h</code>. The engine provides full ES5.1 compliance including regular expressions, JSON, closures, prototypes, exception handling, and the complete set of built-in objects. Its ~200 KB code footprint and configurable heap make it viable on machines with as little as 64 MB RAM.</p>
+<h3>Metrowerks CodeWarrior 8 Pro</h3>
+<p>The compiler. The last professional C/C++ IDE for Classic Mac OS, running natively on the same machine it targets. CW8's C89 mode, while strict, proved capable of compiling a combined codebase of over 130,000 lines including the 3.6 MB Duktape amalgamation — the largest single translation unit ever compiled on this platform for this project. The 8.3 update's improved optimizer generates reasonable PowerPC code despite the C89 constraints.</p>
+<h3>Carbon API (Apple)</h3>
+<p>The application framework. Carbon provides the window manager, event loop, controls, QuickDraw drawing, and Open Transport networking that MacSurf uses. Designed as a bridge between Classic Mac OS and OS X, Carbon gave MacSurf access to modern (for 2001) UI primitives while remaining compatible with the cooperative multitasking model of OS 9.</p>
+<h3>Open Transport (Apple)</h3>
+<p>The networking layer. MacSurf uses plain (non-InContext) Open Transport calls for TCP/IP, matching the patterns established by cy384's SSHeven and the Retro68 OT TCP demo. Synchronous blocking calls with <code>OTUseSyncIdleEvents</code> and a yield-to-thread notifier keep the UI responsive during network operations.</p>
+<h3>MacSurf Proxy (custom, Go)</h3>
+<p>The TLS termination layer. A single Go binary running on a VPS (Hetzner, Germany) that receives plain HTTP from the Mac, fetches the requested URL via HTTPS, and returns the response as plain HTTP. No configuration files, no dependencies. The proxy is what makes modern HTTPS websites accessible to a machine that has no TLS stack.</p>
+<h3>Claude (Anthropic)</h3>
+<p>The development partner. The MacSurf codebase — frontend, library ports, build system integration, JavaScript engine wiring, and proxy — was developed in collaboration with Claude, Anthropic's AI assistant. Claude wrote the C89-compatible source code, diagnosed CodeWarrior compilation errors from error logs transmitted via reverse SSH tunnel from the Mac, and iteratively debugged runtime crashes from CW8's debugger output and screenshots of the physical machine. The development workflow was: write code on a Linux server, zip it, SCP it to the Mac via reverse tunnel, compile on the Mac, photograph or transcribe errors, send them back, iterate.</p>
+<hr />
+<h2>The Timeline</h2>
+<h3>v0.1 — The Browser Shell (March-April 2026)</h3>
+<ul>
+<li>Carbon window with toolbar, URL bar, scrollbar</li>
+<li>Open Transport HTTP fetcher via proxy</li>
+<li>HTML tag stripping + word-wrap text renderer</li>
+<li>Cooperative event loop with WaitNextEvent</li>
+<li>Working navigation: back, forward, reload, home</li>
+<li>FrogFind.com loading successfully on real hardware</li>
+</ul>
+<h3>v0.2 — The NetSurf Core (April 15, 2026)</h3>
+<ul>
+<li>All five NetSurf libraries linked (443 .c files, ~125K LOC)</li>
+<li>nsoption, nscolour, system colour subsystems initialized</li>
+<li>Full NetSurf js_thread API wired</li>
+<li>Browser boots through netsurf_init without crashing</li>
+<li>Real content fetching through the v0.1 OT path</li>
+</ul>
+<h3>v0.2-moonshot — JavaScript (April 15-16, 2026)</h3>
+<ul>
+<li>Duktape 2.7.0 integrated in a single session</li>
+<li>Hand-crafted duk_config.h for PPC big-endian + CW8 C89</li>
+<li>Zero patches to duktape.c itself</li>
+<li><code>1+1=2</code> smoke test passed on first run</li>
+<li>First real JavaScript-bearing web page loaded from mac.mp.ls</li>
+<li>12 stress tests executed: closures, prototypes, quicksort, regex, promises, Ackermann, hash tables, matrix multiply, BST, and ASCII Mandelbrot</li>
+<li>All tests pass on real hardware</li>
+</ul>
+<h3>v0.3 — Real HTML rendering (April 18-19, 2026)</h3>
+<ul>
+<li>libdom hubbub binding ported to C89 / CW8</li>
+<li>Full DOM tree construction from real HTML5</li>
+<li>libcss cascade wired into computed-style lookups</li>
+<li><code>var()</code> custom-property resolution working</li>
+<li>MacTrove.com homepage rendering on real hardware for the first time</li>
+</ul>
+<h3>v0.4 — CSS3 visible on hardware (May 13, 2026)</h3>
+<ul>
+<li>Defensive-clamp threshold first hit and worked around (precursor to fixes156)</li>
+<li>QuickDraw plotters honour cascade-computed colour, fonts, borders, padding, margins, backgrounds</li>
+<li>Box model fully wired</li>
+<li>Lists (disc / circle / square / decimal) with bullet-glyph rendering correct</li>
+<li>Flexbox <code>justify-content</code>, <code>order</code>, basic line-box flow</li>
+<li>Block + inline + table layout all real</li>
+</ul>
+<h3>v0.4.x — CSS feature catch-up (May 14-19, 2026)</h3>
+<ul>
+<li><strong>fixes47</strong> — real linear gradients via QuickDraw row-by-row painting</li>
+<li><strong>fixes48-49</strong> — <code>box-shadow</code> with custom colours + asymmetric offsets, opacity via QD stipple</li>
+<li><strong>fixes50</strong> — <code>text-shadow</code> via vendor <code>-macsurf-text-shadow</code></li>
+<li><strong>fixes73a-e</strong> — <code>transform: rotate/scale/translate</code> via vendor packed property</li>
+<li><strong>fixes74d</strong> — radial gradients</li>
+<li><strong>fixes75e</strong> — CSS Grid V1 (cols+rows, equal tracks, span)</li>
+<li><strong>fixes77g</strong> — offscreen GWorld back buffer (no more flicker)</li>
+<li><strong>fixes78</strong> — image rendering (PNG/GIF/JPEG/BMP/TIFF via lodepng + libnsbmp + libnsgif + libjpeg + libtiff)</li>
+<li><strong>fixes79b</strong> — PNG transparency via lodepng + <code>CopyMask</code></li>
+<li><strong>fixes115</strong> — <code>grid-template-columns</code> standard grammar (preprocessor route)</li>
+<li><strong>fixes119</strong> — replaced-element <code>aspect-ratio</code> preservation in flex stretch</li>
+<li><strong>fixes128</strong> — image scaling polish</li>
+<li><strong>fixes134a</strong> — CSS counters</li>
+<li><strong>fixes143a</strong> — disc-bullet glyph repair (U+00B7 over U+2022 in Helvetica TT)</li>
+<li><strong>fixes146</strong> — <code>text-overflow: ellipsis</code></li>
+<li><strong>fixes147</strong> — CSS 2.1 stacking-context paint order (sibling-level z-index)</li>
+<li><strong>fixes148</strong> — Grid V2 standard track grammar (<code>1fr</code>, <code>repeat()</code>, <code>minmax()</code>, idents)</li>
+<li><strong>fixes149</strong> — viewport units, min-height verified working on hardware</li>
+</ul>
+<h3>v0.5 — Grid V2 + font dispatch (May 20, 2026)</h3>
+<ul>
+<li><strong>fixes150</strong> — <code>grid-template-rows</code> (px row tracks; FR/percent degrade to tallest-child)</li>
+<li><strong>fixes151</strong> — <code>grid-column</code> placement V1 (<code>span N</code>, <code>A / B</code>, <code>1 / -1</code> fill sentinel)</li>
+<li><strong>fixes152</strong> — CSS <code>aspect-ratio</code> V1 (vendor packed property)</li>
+<li><strong>fixes153</strong> — <code>GetFontInfo</code> vmetric probe + audit of <code>gui_layout_table</code> for per-font ascent/descent</li>
+<li><strong>fixes155</strong> — <code>hrbc:</code> diagnostic probe at <code>html_redraw_box_children</code> entry; caught the smoking gun for fixes156</li>
+<li><strong>fixes156</strong> — major stability fix: raised defensive-clamp y/height threshold in <code>redraw.c html_redraw_box</code> from ±10000 to ±200000. Closed the &quot;empty render&quot; saga that had appeared after page-height growth past 10000 px from accumulated probe cards. Root cause was always a latent threshold, not the fixes154 alias retry it was initially blamed on.</li>
+<li><strong>fixes157</strong> — font-family aliases dispatch (sans → Helvetica, serif → Times, monospace → Monaco). Closes the fixes52/fixes145 five-year &quot;force Helvetica&quot; workaround. The fixes145 horizontal-scrambling hypothesis was disproven on real hardware once fixes156 was in place.</li>
+<li><strong>fixes158</strong> — explicit CSS Grid placement (V1). Packed <code>grid-column</code> + <code>grid-row</code> + <code>-start/-end</code> longhands into the existing <code>-macsurf-grid-col-span</code> int32 (four 8-bit fields). Three-pass walker in <code>layout_grid.c</code>.</li>
+<li><strong>fixes158a</strong> — auto-flow occupancy bitmap so explicit grid items don't get overdrawn by auto-flow siblings. Per-row uint8 bitmap, pre-marks explicit cells, auto cursor skips occupied cells row-major.</li>
+<li><strong>fixes159</strong> — Grid V2 alignment (<code>justify-items</code>, <code>align-items</code>, <code>justify-self</code>, <code>align-self</code> with <code>start | end | center | stretch</code>). Crashed on G3 due to mid-struct field insertion.</li>
+<li><strong>fixes159a</strong> — relocate <code>macsurf_justify</code> to end of <code>css_computed_style_i</code> struct. CW8 misses-header-recompile meant libcss .o files had pre-fixes159 field offsets while netsurf .c files had new offsets — silent crash mid-reformat.</li>
+</ul>
+<hr />
+<h2>The Benchmarks</h2>
+<p>Measured on the Power Macintosh G3 Minitower with Sonnet G4 400 MHz upgrade, Mac OS 9.1, 192 MB RAM.
+Duktape 2.7.0, DUK_USE_NATIVE_CALL_RECLIMIT 128.</p>
+<table>
+<thead>
+<tr>
+<th>Test</th>
+<th>Result</th>
+<th>Time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Linked list: 10,000 nodes + reversal</td>
+<td>Correct</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>Regex: email extraction from prose</td>
+<td>4/4 found</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>Promise polyfill: 3-step chain</td>
+<td>Correct (6)</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>BST: 15-node insert + in-order traversal</td>
+<td>Correct</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>Matrix multiply: 30x30</td>
+<td>Correct</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>Event emitter: 1,000 events x 2 listeners</td>
+<td>2,001 fired</td>
+<td>&lt;1 ms</td>
+</tr>
+<tr>
+<td>Quicksort: 5,000 random integers</td>
+<td>Verified sorted</td>
+<td>1,000 ms</td>
+</tr>
+<tr>
+<td>Hash table: 10,000 insert + lookup</td>
+<td>10,000/10,000</td>
+<td>1,000 ms</td>
+</tr>
+<tr>
+<td>String builder: 100,000 chars (array+join)</td>
+<td>100,000 length</td>
+<td>2,000 ms</td>
+</tr>
+<tr>
+<td>100K Math.sqrt + Math.sin loop</td>
+<td>Completed</td>
+<td>3,000 ms</td>
+</tr>
+<tr>
+<td>Ackermann(3,7)</td>
+<td>1,021 (correct)</td>
+<td>5,000-6,000 ms</td>
+</tr>
+<tr>
+<td>Mandelbrot: 40x20 ASCII, 80 max iterations</td>
+<td>Renders correctly</td>
+<td>~2,000 ms</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>The Screenshots</h2>
+<p>The curated milestone set in <a href="../screenshots/"><code>screenshots/</code></a> shows the project as it stands today:</p>
+<h3>Running on real Mac OS 9</h3>
+<p><img src="../screenshots/01-running-on-os9.jpg" alt="MacSurf running in real Mac OS 9 on a G3 iMac" /></p>
+<p>The fixes50 text-shadow probe page, rendered on a real Power Macintosh G3 iMac running Mac OS 9.1 with CarbonLib. Platinum theme, beige hardware, modern CSS3 in 2026.</p>
+<h3>Real CSS typography on Mac OS 9</h3>
+<p><img src="../screenshots/02-css-typography.jpg" alt="CSS typography, custom properties, nested lists" /></p>
+<p>&quot;MacSurf — pushing the cascade.&quot; Author CSS with custom properties (<code>var(--sans)</code>), nested unordered and ordered lists with the bullet-glyph repair from fixes143a, definition lists, mathematical inline elements — all driven by libcss + the QuickDraw plotters.</p>
+<h3>Linear gradients + flex layout</h3>
+<p><img src="../screenshots/03-css-gradients-and-flex.jpg" alt="CSS linear gradients with flex justify-content" /></p>
+<p>fixes47's real per-row QuickDraw gradient painting plus flex-box <code>justify-content</code> distribution variants. Four gradient bars over <code>start / end / center / between / around / evenly</code> flex modes, all on real hardware.</p>
+<h3>Cards, callouts, tables</h3>
+<p><img src="../screenshots/04-css-cards-and-tables.jpg" alt="Border-radius cards, accent-border callouts, styled tables" /></p>
+<p><code>border-radius</code> cards (via <code>FrameRoundRect</code> / <code>PaintRoundRect</code>), accent-left callouts for notes and warnings, and a real CSS feature-support matrix rendered as a styled HTML table.</p>
+<h3>Text-shadow + opacity</h3>
+<p><img src="../screenshots/05-css-shadows-and-opacity.jpg" alt="text-shadow + opacity stipple via QuickDraw" /></p>
+<p>fixes50's <code>-macsurf-text-shadow</code> paints drop shadows under DrawText, with QuickDraw stipple patterns providing the opacity steps from solid → invisible.</p>
+<h3>The Mandelbrot</h3>
+<p><img src="../screenshots/06-javascript-mandelbrot.jpg" alt="ASCII Mandelbrot fractal computed by Duktape" /></p>
+<p>An ASCII Mandelbrot set, 40x20 characters, 80 iterations per pixel, computed entirely in JavaScript by Duktape on a PowerPC G3 running Mac OS 9. The fractal that proved a 1998 machine can run a modern scripting language.</p>
+<hr />
+<h2>What's Next</h2>
+<ul>
+<li><strong>Grid V2 alignment</strong> — fixes159a awaiting hardware verification at time of writing</li>
+<li><strong>fixes160 — <code>grid-template-areas</code></strong> — named cell regions for explicit placement by name</li>
+<li><strong>fixes161 — <code>column-count</code> / <code>column-rule</code></strong> — multi-column layout outside Grid</li>
+<li><strong>fixes162 — <code>outline</code></strong> — focus-ring accessibility polish</li>
+<li><strong>macSSL integration</strong> — pull the sibling project's TLS 1.2 library into the MacSurf binary so HTTPS can happen natively on the Mac, with the Go proxy as a fallback path</li>
+</ul>
+<hr />
+<h2>Credits</h2>
+<p><strong>Patrick Britton</strong> — Creator, hardware wrangler, build engineer, tester, and the person who believed a 1998 Power Mac could run JavaScript in 2026.</p>
+<p><strong>Claude (Anthropic)</strong> — Development partner. Wrote the C code, diagnosed CW8 errors from transcribed logs, debugged crashes from photographs of a CRT monitor, and kept shipping fixes until the Mandelbrot rendered.</p>
+<p><strong>Sami Vaarala</strong> — Creator of Duktape. The decision to write an ES5 engine in portable C89 with a single-file amalgamation is what made this entire project possible. Duktape compiled on CodeWarrior 8 with zero source patches.</p>
+<p><strong>NetSurf contributors</strong> — The NetSurf browser's clean C architecture, explicit POSIX-free design, and cooperative-multitasking frontend model gave MacSurf a real browser engine to build on.</p>
+<p><strong>cy384</strong> — Author of SSHeven and the Retro68 OT TCP demo. The Open Transport patterns MacSurf uses for networking are directly derived from cy384's verified-working implementations.</p>
+<p><strong>Macintosh Garden (macintoshgarden.org)</strong> — The indispensable archive of Classic Mac software. CodeWarrior 8, ResEdit, system software, extensions, utilities — if it ran on a classic Mac and you needed it, Macintosh Garden had it. This project would not have been possible without the preservation work of that community.</p>
+<p><strong>Gary Hansen (1947–2002)</strong></p>
+<p><img src="photos/gary.jpeg" alt="Gary Hansen" /></p>
+<p><img src="photos/garykaija.jpeg" alt="Gary and Kaija" /></p>
+<p><img src="photos/gary-mechanic.jpg" alt="Gary the mechanic" /></p>
+<p><img src="photos/gary-reflection.jpg" alt="Gary's reflection in chrome" /></p>
+<p>Gary Hansen was a communications lifer who rode every wave the industry threw at him. He started shooting photos and filing stories for the New Ulm Daily Journal at thirteen, landed at the Associated Press by twenty-one — covering Nixon, Bobby Kennedy, and McGovern out of the Pierre, SD bureau — and by the mid-'80s had pivoted hard into the desktop publishing revolution, training thousands of employees at shops like 3M, Honeywell, and General Mills on the Mac tools that were rewriting the rules of print. He called himself &quot;the quintessential Renaissance Man of communications,&quot; and the resume backed it up.</p>
+<p>By the mid-'90s Gary had founded Digital Concepts Corporation out of his home in Edina, Minnesota, building websites, managing hosting, and doing print design and photography for a stable of clients. He ran four browsers simultaneously for cross-browser testing, kept nearly 1,700 bookmarks organized across them, and was an early adopter of everything from PageMaker to cable internet to Napster. His Power Mac G3 — upgraded with a Sonnet Encore G4 processor because stock specs were never quite enough — was the nerve center for all of it.</p>
+<p>Outside the screen, Gary was a private pilot, a certified SCUBA diver, a chess tactician, and a deeply committed motorcycle guy. He served on the board of the Minnesota Motorcycle Riders Association, designed their Freedom Review newsletter in PageMaker, lobbied for rider legislation, and eventually signed on as General Manager at Easyriders of Minneapolis — submitting a brutally honest five-page application that noted, among his weaknesses, &quot;no tattoos.&quot;</p>
+<p>He was a father who named every password after his daughter Kaija, a husband to Deb, and a guy who helped everyone around him get online, get a resume typed, or get a computer set up. He was 55 when he died in September 2002. The G3 that powers this browser was part of his world — and this project is a small way of keeping that machine, and the curiosity behind it, running.</p>
+<p><strong>The Classic Mac community</strong> — Everyone keeping these machines alive, sharing knowledge about CarbonLib, Universal Interfaces, and the art of writing software for an OS that Apple abandoned 24 years ago.</p>
+<hr />
+<p><em>MacSurf is open source. The code, the story, and the screenshots are all real. No emulators were used. No shortcuts were taken. Gary's Power Macintosh G3 from 1998 runs JavaScript in 2026.</em></p>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

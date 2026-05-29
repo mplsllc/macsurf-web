@@ -1,0 +1,4 @@
+# Build / handoff artifacts — not part of the published site
+website-handoff.tar
+.nextcloudsync.log
+.DS_Store

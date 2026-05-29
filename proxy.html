@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Running the Go proxy — MacSurf</title>
+<meta name="description" content="Deploy the MacSurf Go proxy that bridges Mac OS 9 plaintext HTTP to the modern HTTPS web.">
+<link rel="canonical" href="https://macsurf.org/proxy.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html" class="active">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Deploy</div>
+    <h1>Running the Go proxy</h1>
+    <p class="lede">Stand up the TLS-stripping Go proxy that lets the browser reach HTTPS sites from inside Mac OS 9.</p>
+    <p>MacSurf Proxy is a single binary. It listens for plain HTTP proxy requests, fetches upstream via HTTPS, and returns plain HTTP. No config files, no dependencies.</p>
+<pre><code>macsurf-proxy [--port 8765] [--auth user:password]
+</code></pre>
+<p>Default port is 8765. Auth is optional — if set, clients must send <code>Proxy-Authorization: Basic</code> headers.</p>
+<hr />
+<h2>1. Local Network (No Install)</h2>
+<p>Build and run directly. Your Mac connects over LAN.</p>
+<pre><code class="language-sh">cd proxy/
+go build -o macsurf-proxy .
+./macsurf-proxy --port 8765
+</code></pre>
+<p>Or with auth:</p>
+<pre><code class="language-sh">./macsurf-proxy --port 8765 --auth myuser:mypassword
+</code></pre>
+<p>Find your machine's LAN IP (<code>ip addr</code> or <code>ifconfig</code>). On the Mac, configure the proxy as <code>http://&lt;your-lan-ip&gt;:8765</code>. That's it.</p>
+<p>If you have a firewall, open port 8765:</p>
+<pre><code class="language-sh">sudo ufw allow 8765/tcp
+</code></pre>
+<hr />
+<h2>2. VPS with systemd (Ubuntu/Debian)</h2>
+<h3>Build the binary</h3>
+<pre><code class="language-sh">cd proxy/
+CGO_ENABLED=0 go build -o macsurf-proxy .
+</code></pre>
+<h3>Create the user</h3>
+<pre><code class="language-sh">sudo useradd --system --no-create-home --shell /usr/sbin/nologin macsurf
+</code></pre>
+<h3>Install the binary</h3>
+<pre><code class="language-sh">sudo cp macsurf-proxy /usr/local/bin/
+sudo chmod 755 /usr/local/bin/macsurf-proxy
+</code></pre>
+<h3>Write the environment file</h3>
+<pre><code class="language-sh">sudo mkdir -p /etc/macsurf-proxy
+sudo tee /etc/macsurf-proxy/env &gt; /dev/null &lt;&lt;'EOF'
+MACSURF_PROXY_ARGS=--port 8765 --auth myuser:mypassword
+EOF
+sudo chmod 600 /etc/macsurf-proxy/env
+</code></pre>
+<p>Change <code>myuser:mypassword</code> to real credentials. If you don't want auth, use:</p>
+<pre><code>MACSURF_PROXY_ARGS=--port 8765
+</code></pre>
+<h3>Install the service</h3>
+<pre><code class="language-sh">sudo cp macsurf-proxy.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now macsurf-proxy
+</code></pre>
+<h3>Verify</h3>
+<pre><code class="language-sh">sudo systemctl status macsurf-proxy
+journalctl -u macsurf-proxy -f
+curl -x http://myuser:mypassword@localhost:8765 http://example.com
+</code></pre>
+<h3>Firewall</h3>
+<pre><code class="language-sh">sudo ufw allow 8765/tcp
+</code></pre>
+<p>For production, put this behind a VPN or restrict source IPs. An open proxy on the internet will get abused.</p>
+<hr />
+<h2>3. Docker</h2>
+<h3>Build</h3>
+<pre><code class="language-sh">cd proxy/
+docker build -t macsurf-proxy .
+</code></pre>
+<h3>Run</h3>
+<pre><code class="language-sh">docker run -d --name macsurf-proxy -p 8765:8765 macsurf-proxy --port 8765 --auth myuser:mypassword
+</code></pre>
+<p>Without auth:</p>
+<pre><code class="language-sh">docker run -d --name macsurf-proxy -p 8765:8765 macsurf-proxy
+</code></pre>
+<h3>Verify</h3>
+<pre><code class="language-sh">curl -x http://myuser:mypassword@localhost:8765 http://example.com
+</code></pre>
+<h3>Logs</h3>
+<pre><code class="language-sh">docker logs -f macsurf-proxy
+</code></pre>
+<hr />
+<h2>4. Classilla Configuration (Mac OS 9)</h2>
+<p>Classilla is a maintained Mozilla fork for Mac OS 9 that supports HTTP proxies. Use it today to validate MacSurf Proxy before MacSurf Browser exists.</p>
+<h3>Step by step</h3>
+<ol>
+<li>Open <strong>Classilla</strong></li>
+<li>Go to <strong>Edit &gt; Preferences</strong></li>
+<li>In the left sidebar, expand <strong>Advanced</strong> and select <strong>Proxies</strong></li>
+<li>Select <strong>Manual proxy configuration</strong></li>
+<li>In the <strong>HTTP Proxy</strong> field, enter your proxy machine's IP address (e.g. <code>192.168.1.50</code>)</li>
+<li>In the <strong>Port</strong> field next to it, enter <code>8765</code></li>
+<li>Check <strong>Use this proxy server for all protocols</strong></li>
+<li>Leave <strong>No Proxy for</strong> set to <code>localhost, 127.0.0.1</code></li>
+<li>Click <strong>OK</strong></li>
+</ol>
+<h3>If you enabled auth on the proxy</h3>
+<p>Classilla supports HTTP Basic proxy auth. On first request, it will prompt for username and password. Enter the credentials you passed to <code>--auth</code>. Check &quot;remember&quot; if offered.</p>
+<h3>Testing</h3>
+<p>Browse to <code>http://example.com</code> — this goes through the proxy as plain HTTP and should load immediately.</p>
+<p>Browse to <code>https://macintoshgarden.org</code> — Classilla sends a CONNECT request, the proxy tunnels TLS end-to-end. The page should load normally with the lock icon.</p>
+<p>If pages don't load, verify:</p>
+<ul>
+<li>The proxy is running and reachable from the Mac (<code>ping &lt;proxy-ip&gt;</code> from another machine on the same network)</li>
+<li>Port 8765 is open on the proxy machine</li>
+<li>The IP and port in Classilla match exactly</li>
+</ul>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Architecture — MacSurf</title>
+<meta name="description" content="MacSurf architecture: NetSurf pipeline, Open Transport networking, QuickDraw plotters, and the Carbon UI layer on Mac OS 9.">
+<link rel="canonical" href="https://macsurf.org/architecture.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html" class="active">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">How it&#x27;s wired</div>
+    <h1>Architecture</h1>
+    <p class="lede">How MacSurf fits together: rendering pipeline, networking, memory model, and the libraries underneath.</p>
+    <h2>A Modern Web Platform for Classic Mac OS 9</h2>
+<p><strong>Version:</strong> 0.2-draft<br />
+<strong>Status:</strong> Design<br />
+<strong>Author:</strong> MPLS LLC<br />
+<strong>License:</strong> MPLS License</p>
+<hr />
+<h2>1. Vision</h2>
+<p>MacSurf is a web platform for Classic Mac OS 9. Not a toy, not a novelty — a real browser
+that loads real websites including Facebook and YouTube, on hardware from 1997 to 2002,
+in a way that is seamless to the user.</p>
+<p>The user opens MacSurf, types facebook.com, and their feed loads. That is the bar.</p>
+<p>To get there, MacSurf is three things working together:</p>
+<ol>
+<li>
+<p><strong>A native Mac OS 9 browser</strong> — a Carbon application built with CodeWarrior 8,
+running on real hardware or SheepShaver, with a rendering pipeline tuned for
+cooperative multitasking and QuickDraw.</p>
+</li>
+<li>
+<p><strong>A smart proxy</strong> — a Go server running on Hetzner that mediates between the
+Mac and the modern web. It strips TLS, rewrites content, executes JavaScript
+server-side, and streams rendered output back to the Mac in formats it can handle.</p>
+</li>
+<li>
+<p><strong>A template layer</strong> — a community-maintained, Git-backed library of site-specific
+rendering rules. When you load facebook.com, a Facebook template runs on the proxy,
+fetches your actual content, and delivers a MacSurf-native layout back to the Mac.
+Templates are versioned, open for contribution, and self-hostable.</p>
+</li>
+</ol>
+<p>These three components are not alternatives — they work together on every page load.
+The rendering mode (Classic / Standard / Full) controls how much of the pipeline runs
+on the Mac vs. on the proxy.</p>
+<hr />
+<h2>2. Rendering Modes</h2>
+<p>MacSurf exposes three rendering modes, selectable in Preferences. The right mode depends
+on the machine and the user's preference for speed vs. fidelity.</p>
+<h3>2.1 Classic Mode</h3>
+<p><strong>Who it's for:</strong> Slower hardware (G3, older G4), maximum compatibility, proxy does the
+heavy lifting.</p>
+<p><strong>How it works:</strong></p>
+<ol>
+<li>Mac sends URL to proxy</li>
+<li>Proxy checks for a matching template</li>
+<li>If template exists: template fetches page content, executes JS server-side, builds a
+clean simplified HTML document with the user's actual content, sends it to the Mac</li>
+<li>If no template: proxy fetches the page, runs it through a general-purpose SSR pass,
+strips incompatible content, sends simplified HTML</li>
+<li>Mac renders the HTML using the native NetSurf pipeline (HTML parser → CSS → layout
+→ QuickDraw plotters)</li>
+</ol>
+<p>JS runs on the proxy. Images are resampled to PICT/GIF at the proxy before delivery.
+The Mac never executes JavaScript.</p>
+<p><strong>Result:</strong> Fast, lightweight, works on any OS 9 machine. Layout fidelity depends on
+the template quality.</p>
+<h3>2.2 Standard Mode</h3>
+<p><strong>Who it's for:</strong> Mid-range hardware (400MHz+ G4), balance of speed and fidelity.</p>
+<p><strong>How it works:</strong></p>
+<p>Same pipeline as Classic, but the proxy delivers a richer HTML payload. The Mac
+executes a limited subset of JavaScript natively via Duktape — enough to handle
+form interactions, basic DOM manipulation, and simple UI state without round-tripping
+to the proxy for every click.</p>
+<p><strong>JS tier:</strong> DOM manipulation, event handlers, form validation, simple state. No
+network-dependent JS (fetch, XHR, WebSocket). Those fall back to proxy-side execution.</p>
+<p><strong>Result:</strong> Pages feel more interactive than Classic. Facebook works including likes
+and comments. YouTube delivers video via the proxy's transcoded stream.</p>
+<h3>2.3 Full Mode</h3>
+<p><strong>Who it's for:</strong> High-end machines, SheepShaver users, people who want to push it.</p>
+<p><strong>How it works:</strong></p>
+<p>The Mac executes as much JavaScript as Duktape can handle. The proxy is still in the
+loop for TLS and template content, but the JS execution burden moves to the client.
+More complex interactions work locally.</p>
+<p><strong>JS tier:</strong> Full Duktape execution. <code>fetch</code> and <code>XHR</code> route through Open Transport
+via a bridge layer. DOM events handled locally. Falls back to proxy for anything that
+crashes or times out.</p>
+<p><strong>Result:</strong> Closest to a real browser experience on the hardware. Some sites will be
+slow on real hardware but fast on SheepShaver.</p>
+<hr />
+<h2>3. The Proxy</h2>
+<p>The current proxy (<code>proxy/</code>) is a 5-file, stdlib-only Go binary. It does TLS stripping
+and CONNECT tunneling. It does not inspect or transform content.</p>
+<p>The v0.2 proxy expands into multiple cooperating Go services on the same Hetzner host.
+Each is a separate binary with a narrow responsibility.</p>
+<h3>3.1 Services</h3>
+<pre><code>macsurf-gateway      Port 8765    Existing proxy, extended with routing and auth
+macsurf-ssr          Internal     Server-side rendering engine (Node.js + Chromium)
+macsurf-template     Internal     Template engine and Git-backed template runner
+macsurf-transcode    Internal     Video/image transcoding for Mac-compatible formats
+macsurf-stream       Internal     Pixel streaming (headless Chromium → screenshot loop)
+</code></pre>
+<p>All services communicate over localhost. The Mac connects only to <code>macsurf-gateway</code>
+on port 8765. Routing is opaque to the client.</p>
+<h3>3.2 Gateway extensions</h3>
+<p><code>macsurf-gateway</code> grows the following beyond what exists today:</p>
+<ul>
+<li><strong>Mode header:</strong> Mac sends <code>X-MacSurf-Mode: classic|standard|full</code> with every
+request. Gateway routes accordingly.</li>
+<li><strong>Template lookup:</strong> Before forwarding any request, gateway checks
+<code>macsurf-template</code> for a matching template. If found, the template handles the
+request instead of a raw upstream fetch.</li>
+<li><strong>Content rewriting:</strong> For non-templated requests in Classic/Standard mode,
+gateway pipes the response through a general-purpose rewriter that strips
+incompatible content, rewrites absolute URLs, and inlines small images.</li>
+<li><strong>Image transcoding:</strong> Images are passed through <code>macsurf-transcode</code> and
+delivered as GIF (for the widest OS 9 compatibility) or PICT.</li>
+<li><strong>Video routing:</strong> Requests to YouTube or other video sources route to
+<code>macsurf-transcode</code>, which fetches the stream and delivers it as MPEG-1 or
+a QuickTime-compatible MPEG-4 at a bitrate the Mac can handle.</li>
+</ul>
+<h3>3.3 SSR engine</h3>
+<p><code>macsurf-ssr</code> runs a headless Chromium instance via Playwright or Puppeteer. When
+a page request arrives with no matching template:</p>
+<ol>
+<li>Chromium fetches and renders the page</li>
+<li>JS executes fully</li>
+<li>The resulting DOM state is serialized to clean HTML</li>
+<li>That HTML is passed back to the gateway for content rewriting and delivery</li>
+</ol>
+<p>This is the fallback for any page without a template. It guarantees that any site
+that works in a modern browser can be delivered to the Mac in some form.</p>
+<h3>3.4 Pixel streaming</h3>
+<p><code>macsurf-stream</code> is the fallback of last resort. When SSR output is too complex for
+the Mac to render (heavy CSS, canvas, WebGL), the mode can be switched to streaming:</p>
+<ol>
+<li>Chromium renders the page at a fixed resolution matching the Mac's window size</li>
+<li>A screenshot is taken on every meaningful change (navigation, scroll, input)</li>
+<li>The screenshot is compressed and sent to the Mac as a PICT or raw bitmap</li>
+<li>The Mac displays it in the browser window</li>
+<li>Mouse clicks and keystrokes are sent back to the proxy as coordinates and events</li>
+</ol>
+<p>The Mac becomes a thin client. The page is always current. Facebook works. YouTube
+works via screenshot + audio stream (see §3.5).</p>
+<p>This mode is intentionally not the default — it requires more server resources and
+is slower to interact with. But it is the option that guarantees any page loads.</p>
+<h3>3.5 Video</h3>
+<p>YouTube and other video is handled in two passes:</p>
+<p><strong>For Standard and Full mode:</strong>
+<code>macsurf-transcode</code> uses ffmpeg to fetch a video stream (via yt-dlp for YouTube),
+transcode it to MPEG-1 or MPEG-4 Baseline at a Mac-appropriate bitrate, and deliver
+it as a progressive HTTP stream. QuickTime on OS 9 opens the stream URL and plays it.</p>
+<p><strong>For Classic mode and pixel streaming:</strong>
+Video plays in Chromium on the proxy. The frame loop captures each video frame as part
+of the screenshot. Audio is delivered separately as a streaming MPEG-1 Audio file that
+QuickTime opens alongside the screenshot window.</p>
+<p>Specific bitrate targets (to be tuned against real hardware):</p>
+<ul>
+<li>G3 / slow G4: 320×240, 500kbps video, 64kbps audio</li>
+<li>Fast G4 / SheepShaver: 640×480, 1.5Mbps video, 128kbps audio</li>
+</ul>
+<hr />
+<h2>4. The Template System</h2>
+<p>Templates are the highest-leverage part of MacSurf. A well-written Facebook template
+means Facebook always works, looks intentional, and feels fast — not like a degraded
+accident.</p>
+<h3>4.1 What a template is</h3>
+<p>A template is a directory in the <code>macsurf-templates</code> Git repository:</p>
+<pre><code>templates/
+  facebook.com/
+    template.json      Metadata: name, version, author, domains, last-verified
+    match.js           URL matching rules (which URLs this template handles)
+    fetch.js           How to fetch content from the site (API calls, auth, etc.)
+    render.js          How to produce MacSurf-native HTML from the fetched content
+    assets/            Optional static assets (icons, CSS snippets)
+  youtube.com/
+    ...
+  reddit.com/
+    ...
+</code></pre>
+<p>Templates run in a sandboxed Node.js environment on <code>macsurf-template</code>. They have
+access to authenticated session cookies (forwarded from the Mac), can make HTTP
+requests to the origin site, and return a complete HTML document.</p>
+<h3>4.2 Template rendering contract</h3>
+<p>A template's <code>render.js</code> receives:</p>
+<pre><code class="language-javascript">{
+  url: &quot;https://facebook.com/&quot;,
+  cookies: { ... },       // forwarded from the Mac's cookie jar
+  mode: &quot;classic&quot;,        // rendering mode from the Mac
+  screen: { w: 800, h: 600 }  // Mac window size
+}
+</code></pre>
+<p>It returns:</p>
+<pre><code class="language-javascript">{
+  html: &quot;...&quot;,            // complete HTML document
+  title: &quot;Facebook&quot;,
+  cookies: { ... },       // updated cookies to send back to the Mac
+  status: 200
+}
+</code></pre>
+<p>The HTML it returns should use only tags and CSS that the Mac's NetSurf build
+can handle. A template style guide (separate doc) will enumerate what's safe.</p>
+<h3>4.3 Template repository</h3>
+<p>The template repository lives at <code>github.com/mplsllc/macsurf-templates</code> (or
+<code>forgejo.mp.ls/mplsllc/macsurf-templates</code> for self-hosters). It is:</p>
+<ul>
+<li><strong>Public</strong> — anyone can read and clone</li>
+<li><strong>Contribution-based</strong> — pull requests accepted for new templates and updates</li>
+<li><strong>Versioned</strong> — each template has a <code>version</code> field and a <code>last-verified</code> date</li>
+<li><strong>Self-hostable</strong> — the <code>macsurf-template</code> service accepts a <code>--templates-repo</code>
+flag pointing at any Git URL</li>
+</ul>
+<p>The proxy polls the template repo on a configurable interval (default: 1 hour) and
+hot-reloads changed templates without restart.</p>
+<h3>4.4 Template priority sites</h3>
+<p>These are the sites that matter most for initial template development, in priority
+order:</p>
+<ol>
+<li>Facebook (feed, profile, messages)</li>
+<li>YouTube (homepage, video page, search)</li>
+<li>Reddit</li>
+<li>Wikipedia (already works well via SSR, template adds speed)</li>
+<li>Gmail</li>
+<li>Google Search</li>
+<li>Twitter/X</li>
+<li>Instagram</li>
+</ol>
+<p>Each of these has a publicly documented API or a well-understood page structure.
+Templates for structured sites (Reddit, Wikipedia, Google Search) are simpler than
+social-graph sites (Facebook, Instagram).</p>
+<hr />
+<h2>5. The Native Browser</h2>
+<p>The Mac OS 9 native browser (<code>browser/netsurf/frontends/macos9/</code>) remains a
+CodeWarrior 8 Carbon application built for PowerPC. The v0.1.0 pipeline
+(OT fetch → strip → word-wrap → DrawText) is replaced by the full NetSurf
+core pipeline.</p>
+<h3>5.1 Rendering pipeline (target state)</h3>
+<pre><code>URL entered
+  → macos9_http_fetcher (Open Transport)
+  → fetch messages (FETCH_HEADER, FETCH_DATA, FETCH_FINISHED)
+  → llcache / hlcache
+  → html_init content handler (libhubbub parser)
+  → DOM tree (libdom)
+  → CSS cascade (libcss)
+  → NetSurf layout engine
+  → CONTENT_MSG_REDRAW
+  → macos9 plotters (QuickDraw)
+  → Window update
+</code></pre>
+<p>Every link in this chain requires real library implementations. The stub layer
+that got us to v0.1.0 must be replaced.</p>
+<h3>5.2 Library dependency order</h3>
+<p>The libraries must be built for CodeWarrior 8 / C89 / PowerPC in this order
+(each depends on the ones above it):</p>
+<pre><code>1. libwapcaplet     String interning (lwc_stub.c already implements this — done)
+2. parserutils      Character encoding, input streams
+3. libhubbub        HTML5 parser (depends on parserutils)
+4. libdom           DOM implementation (depends on libhubbub, libwapcaplet)
+5. libcss           CSS parser and cascade (depends on libwapcaplet, parserutils)
+6. NetSurf core     html_init, nscss_init (depends on libdom, libcss)
+</code></pre>
+<p>This is the v0.2 milestone for the native browser. It is large. Each library
+is a separate porting effort with its own C89 compliance pass and shim layer.</p>
+<h3>5.3 JavaScript — Duktape</h3>
+<p>Duktape is the JavaScript engine for Standard and Full modes. It is written in C,
+designed to be embedded, and has been ported to constrained environments before.</p>
+<p>The porting target is the same as the rest of the native build: C89, CodeWarrior 8,
+PowerPC, no POSIX, cooperative multitasking.</p>
+<p>The Duktape build is gated on the library dependency chain above — JS execution
+requires a working DOM to be useful. It is a v0.3 milestone.</p>
+<p><strong>JS tier implementation:</strong></p>
+<ul>
+<li><strong>Classic mode:</strong> Duktape not loaded. <code>js_stub.c</code> remains active.</li>
+<li><strong>Standard mode:</strong> Duktape loaded. DOM events, form handling, simple state.
+Network-dependent JS disabled (<code>fetch</code>, <code>XHR</code> stubbed to fail gracefully).</li>
+<li><strong>Full mode:</strong> Duktape loaded with OT-backed <code>fetch</code> and <code>XHR</code> via a bridge
+in <code>macos9_fetch.c</code>. Full execution within Duktape's capability envelope.</li>
+</ul>
+<h3>5.4 Mode selection</h3>
+<p>Mode is selected in a MacSurf Preferences dialog (classic Mac OS modal, system font,
+radio buttons). The selected mode is stored in a preferences file alongside the
+application and sent as <code>X-MacSurf-Mode</code> on every proxy request.</p>
+<p>A status indicator in the browser toolbar shows the active mode for the current page.
+If the proxy falls back from a higher mode (e.g. SSR times out in Standard mode and
+pixel streaming is used instead), the indicator updates to reflect the actual mode used.</p>
+<h3>5.5 Bookmarks and history</h3>
+<p>Both are v0.2 scope alongside the core rendering pipeline.</p>
+<p><strong>Bookmarks:</strong> Stored as a flat text file alongside the application (Mac HFS+ path).
+Accessible from a Bookmarks menu. Add/remove/organize via a standard list dialog.
+No folder hierarchy in v0.2 — that is v0.3.</p>
+<p><strong>History:</strong> In-memory during the session. Written to a flat file on quit, loaded
+on launch. Standard Back/Forward navigation via the existing toolbar buttons.
+A History window (separate from the browser window) showing recent URLs is v0.3.</p>
+<hr />
+<h2>6. Milestones</h2>
+<h3>v0.2 — Real rendering pipeline</h3>
+<ul>
+<li>Port libwapcaplet (already done via lwc_stub.c), parserutils, libhubbub, libdom,
+libcss to C89 / CodeWarrior 8</li>
+<li>Replace all rendering stubs with real implementations</li>
+<li>Implement macos9 plotters (QuickDraw: clip, rectangle, text, bitmap)</li>
+<li>Implement macos9_http_fetcher backed by Open Transport</li>
+<li>Wire browser_window_create and netsurf_init into the main loop</li>
+<li>Proxy: template system, SSR engine, general-purpose content rewriter</li>
+<li>Template: facebook.com v1, youtube.com v1 (Classic mode only)</li>
+<li>Bookmarks and history (basic)</li>
+</ul>
+<h3>v0.3 — JavaScript and interactivity</h3>
+<ul>
+<li>Port Duktape to C89 / CodeWarrior 8</li>
+<li>Standard mode JS tier (DOM events, form handling)</li>
+<li>Full mode JS tier (OT-backed fetch/XHR bridge)</li>
+<li>Pixel streaming mode (macsurf-stream service)</li>
+<li>Video transcoding (macsurf-transcode + QuickTime stream)</li>
+<li>History window, bookmark folders</li>
+<li>Template: reddit.com, google.com, gmail.com</li>
+</ul>
+<h3>v0.4 — Community and polish</h3>
+<ul>
+<li>Template repository public launch</li>
+<li>Self-hosting documentation</li>
+<li>macsurf-templates contribution guide and style guide</li>
+<li>Per-template update notifications in the browser</li>
+<li>Offline mode (proxy cache, templates cached locally)</li>
+<li>Additional templates: twitter.com, wikipedia.com, instagram.com</li>
+</ul>
+<hr />
+<h2>7. Infrastructure</h2>
+<p>All services run on the existing Hetzner host (<code>116.202.231.103</code>). Current load is
+negligible (5.3 MB RSS for the proxy after 3 days). The host has capacity for
+Chromium headless (SSR and streaming) and ffmpeg (transcoding).</p>
+<p>Each service is a separate systemd unit under the <code>macsurf</code> user. The existing
+<code>macsurf-proxy.service</code> pattern is the template for all new units.</p>
+<p>Service communication is over <code>127.0.0.1</code> only. The gateway is the sole public-facing
+process.</p>
+<p>Self-hosters run the same stack via Docker Compose. A <code>docker-compose.yml</code> at the
+repo root starts all services with sane defaults.</p>
+<hr />
+<h2>8. Open questions</h2>
+<p>These are not answered by this document and require decisions before implementation:</p>
+<ol>
+<li>
+<p><strong>Session / cookie handling:</strong> How does the Mac persist cookies across sessions?
+The proxy needs to forward them to templates. Does the Mac store them locally and
+send them with every request, or does the proxy maintain a session store keyed to
+the Mac's IP or a session token?</p>
+</li>
+<li>
+<p><strong>Authentication:</strong> Facebook and Gmail require login. How does the user authenticate?
+Options: (a) the Mac sends credentials to the template which logs in on their
+behalf, (b) pixel streaming is used for login pages and Classic/Standard resumes
+after auth, (c) session cookies are imported from another browser.</p>
+</li>
+<li>
+<p><strong>HTTPS from the Mac:</strong> Currently the Mac sends plain HTTP to the proxy and the
+proxy handles TLS upstream. Is that acceptable long-term, or does the Mac-to-proxy
+connection need encryption? (The connection is over the public internet today.)</p>
+</li>
+<li>
+<p><strong>Template sandbox security:</strong> Templates run JS on the proxy. What is the sandbox
+boundary? Can a malicious template exfiltrate the user's cookies from another site?</p>
+</li>
+<li>
+<p><strong>Pixel streaming resolution:</strong> What resolution does the Mac browser window actually
+support? The screenshot from Chromium must match it exactly or the bitmap fill
+will be wrong.</p>
+</li>
+<li>
+<p><strong>Audio delivery:</strong> What audio formats can QuickTime on OS 9 stream over HTTP?
+MPEG-1 Audio Layer 3 (MP3) should work. Does it handle chunked HTTP, or does it
+need a complete file?</p>
+</li>
+</ol>
+<hr />
+<h2>9. What this is not</h2>
+<p>MacSurf is not trying to make OS 9 a general-purpose modern computing platform.
+It is a browser for people who love classic Mac hardware and want to use it. The proxy
+and template layer exist in service of that goal — they are infrastructure, not the
+product. The product is the experience of opening MacSurf on a beige G3, going to
+Facebook, and seeing your actual feed.</p>
+<p>Every architectural decision should be evaluated against that bar.</p>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

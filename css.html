@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CSS status — MacSurf</title>
+<meta name="description" content="MacSurf CSS implementation status: 150+ properties categorised as done, partial, planned, or deferred — verified on PowerPC G3 hardware.">
+<link rel="canonical" href="https://macsurf.org/css.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html" class="active">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Implementation truth</div>
+    <h1>CSS status</h1>
+    <p class="lede">Which CSS properties are real on PowerPC hardware, which are partial, and which are still planned. Generated from the implementation, not the wish list.</p>
+    <p>Generated 2026-05-19. Last revised 2026-05-20 (fixes159a in flight, fixes150-158a all hardware-verified).</p>
+<p>This is a brutal, hedge-free audit of CSS support in MacSurf. The goal is to identify what works, what doesn't, and what to implement next.</p>
+<h2>Hardware-verified status (post fixes158a)</h2>
+<pre><code class="language-text">CSS Grid V2 — auto-flow occupancy avoidance: ✓
+- fixes158a (2026-05-20): per-row uint8 bitmap (256 bytes — bit
+  (1 &lt;&lt; col) per row, max 8 cols × 256 rows) tracks which cells
+  are occupied by explicit-both placements.
+- Three-pass walker in layout_grid.c:
+  - Pass 0: pre-mark cells used by every child with both axes
+    explicit (grid-column + grid-row both set in the same rule).
+  - Pass 1: assign every child a (col, row, col_span, row_span).
+    Auto-flow cursor advances row-major past any occupied cell
+    so unplaced siblings flow predictably around explicit items.
+    col-only / row-only explicit items find the first free
+    row / col from cursor and mark cells on placement.
+  - Pass 2: lay out into cell width; track per-row max heights.
+  - Pass 3: compute row_y once heights are known; position each
+    child.
+- Wire format unchanged from fixes158: packed int32 in existing
+  `-macsurf-grid-col-span` storage, four 8-bit fields:
+  col_span (low) / col_start / row_start / row_span (high).
+- Test cards GP1-GP6 on G3, all 6 pass:
+  GP1: ✓ explicit GP1-1 spans cols 1-2 + auto GP1-2/GP1-3 at cols 3,4
+  GP2: ✓ three auto + one explicit at (col 2, row 2), no collision
+  GP3: ✓ three explicit items at distinct cells, none collapse
+  GP4: ✓ four auto in row 1, one explicit alone in row 2
+  GP5: ✓ longhand start/end pair (cs2 ce4 rs1 re2) spans cols 2-3,
+       auto GP5-3 advances past to col 4
+  GP6: ✓ fixes151 baseline (span 2 + 1/-1 fill) still works
+- V1 limitations: column + row placement must live in the SAME
+  CSS rule (cascade collapses storage at property level); no
+  grid-area shorthand; no named lines; no negative line numbers
+  beyond `-1` fill sentinel; no grid-template-areas; no dense
+  auto-flow; no subgrid. Max 256 children per grid; max 256
+  rows.
+</code></pre>
+<h2>Hardware-verified status (post fixes157)</h2>
+<pre><code class="language-text">Font-family alias dispatch: ✓
+- fixes157 (2026-05-20): font-family aliases work per-family on
+  shared dispatch (macos9_font_id_from_style in plotters.c +
+  macos9_font.c). PLOT_FONT_FAMILY_SANS_SERIF/CURSIVE/FANTASY →
+  kFontIDHelvetica, SERIF → kFontIDTimes, MONOSPACE → kFontIDMonaco.
+  Both width measurement and paint use the same dispatch so width
+  and paint always agree per family.
+- Closes the fixes52/fixes145 &quot;force Helvetica&quot; five-year sidestep.
+  The fixes145 horizontal-scrambling hypothesis is now disproven
+  on real hardware — the actual cause was fixes156's clamp bug,
+  which appeared as &quot;alias dispatch broke rendering&quot; when in fact
+  the page just grew past 10000 px and the defensive clamp nuked
+  legitimate content.
+- Test cards FF1-FF5 on G3 (verified visually + log-confirmed
+  width=paint per family):
+  FF1 (sans-serif): ✓ Helvetica TT
+  FF2 (serif): ✓ Times TT, visibly serifed
+  FF3 (monospace): ✓ Monaco bitmap, all glyphs same width
+  FF4 (mixed Helvetica + Monaco inline, line-height 1.5): ✓
+       no horizontal scrambling, baselines aligned
+  FF5 (same as FF4 but line-height 1.0, the V1 edge case): ✓
+       Monaco glyphs may extend slightly above the Helvetica
+       baseline of the previous line; documented V1 limitation
+       requiring per-font line-height to fully resolve.
+- fixes157a kept the FONTDIAG probe block in source as a dormant
+  handle (MACSURF_FONT_ALIAS_DIAG = 0); flip to 1 in macos9.h to
+  re-enable per-call width/paint logging if a future regression
+  needs verification.
+</code></pre>
+<h2>Hardware-verified status (post fixes156)</h2>
+<pre><code class="language-text">Defensive-clamp threshold scaling: ✓ (critical stability fix)
+- fixes156 (2026-05-20): raised y/height threshold in
+  redraw.c html_redraw_box from ±10000 to ±200000. Closes the
+  empty-render saga that fixes154/154b/154c/155 had chased
+  through the wrong cause for four rounds.
+- Root cause: the defensive clamp added years earlier (catching
+  CSS-engine garbage like box-&gt;x = 30728, descendant_y0 =
+  -39845888) used ±10000 thresholds. Safe when advanced.html
+  was shorter — but probe cards accumulated across fixes147→154
+  grew the page past 10000 px (c_h = 10035). The 10035 &gt; 10000
+  check then fired on the LEGITIMATE root box every redraw,
+  zeroing box-&gt;height to 0, descendant_y1 to that new zero,
+  first-child clip intersection collapsed to inverted,
+  line-2557 early-return without recursing. Page rendered
+  empty.
+- New thresholds catch the original -39845888 garbage with 4
+  orders of magnitude headroom while allowing pages up to 200k
+  px tall. x-coords and widths stay at ±10000 (no real page
+  goes wider than that).
+- Symptom signature to recognise in future: redraw counters
+  show `visits=2 block=2 inlinec=0 inline=0 text=0` while
+  recascade walks the full tree (1041+ boxes). Tree intact,
+  redraw bails after html+body. Log the root box's h and
+  descendant_y1 — if zero but c_h in reformat isn't, the clamp
+  is nuking real content.
+</code></pre>
+<h2>Hardware-verified status (post fixes152)</h2>
+<pre><code class="language-text">CSS aspect-ratio: ✓
+- fixes152 (2026-05-19): vendor-packed property storing
+  (numerator &lt;&lt; 16) | denominator in a single int32. Layout
+  uses width = h * num / denom and height = w * denom / num
+  to derive the missing dimension when one is set and the
+  other is auto.
+- Cards A1-A4 on G3:
+  A1 (200x112 from 16/9): ✓
+  A2 (300x300 from 1): ✓
+  A3 (240x180 from 4/3): ✓
+  A4 (200x100 from 2/1, explicit height): ✓
+- Replaced-element images preserve the aspect-ratio from fixes119
+  when laid out in flex stretch contexts.
+</code></pre>
+<h2>Hardware-verified status (post fixes151)</h2>
+<pre><code class="language-text">Grid `grid-column` explicit placement V1: ✓ (superseded by fixes158)
+- fixes151 (2026-05-19): preprocessor in cssh_css.c rewrites
+  standard CSS grid-column declarations to vendor
+  `-macsurf-grid-col-span: N` integer:
+    span N            -&gt; col-span N
+    A / B (ints&gt;0)    -&gt; col-span (B-A)
+    A / span N        -&gt; col-span N
+    A / -1            -&gt; col-span 255 (sentinel &quot;fill row&quot;)
+    1 / -1            -&gt; col-span 255
+- Cards C1-C5 on G3 all pass.
+- Storage: uint8_t in style-&gt;i (later extended in fixes158 to a
+  full packed int32 carrying col_start/row_start/row_span too).
+</code></pre>
+<h2>Hardware-verified status (post fixes150)</h2>
+<pre><code class="language-text">Grid `grid-template-rows` V1: ✓
+- fixes150 (2026-05-19): px row tracks force per-row heights
+  (overriding tallest-child sizing). fr / percent row tracks
+  degrade to tallest-child because the V1 doesn't have a
+  definite container height to distribute against in the auto
+  case.
+- Cards R1-R5 on G3:
+  R1 (80px 120px): ✓ exact heights
+  R2 (1fr 2fr in 240px-tall container): ✓ fr degraded to
+       tallest-child (documented guardrail)
+  R3 (repeat(3, 60px)): ✓ three 60px rows
+  R4 (60px 120px with 200px 1fr cols): ✓
+  R5 (50px 100px + row-gap 16px + column-gap 16px): ✓
+</code></pre>
+<h2>Hardware-verified status (post fixes148)</h2>
+<pre><code class="language-text">CSS Grid V2 — grid-template-columns: ✓ Standard tracks (most patterns)
+- fixes148 (2026-05-19): rewrites p_grid_template_columns.c to extract
+  real track widths from the standard CSS Grid grammar and emit them in
+  the same packed bytecode format p_macsurf_grid.c uses. Both properties
+  target CSS_PROP_MACSURF_GRID so the select side reads identically.
+- Also fixes a latent bytecode-format bug from fixes112 where the parser
+  emitted only 2 entries (OPV + packed) but the select side reads 10
+  (OPV + packed + 8 track ints) — silent for years because identical
+  sources produced identical garbage that survived arena interning.
+- Grammar: &lt;length&gt;, &lt;percentage&gt;, &lt;flex&gt;, bare &lt;number&gt;, repeat(N, ...),
+  repeat(auto-fill|auto-fit, ...) heuristic *3, minmax(min, max),
+  fit-content(...), auto/min-content/max-content idents, [&lt;line-name&gt;].
+- Track encoding: bits 31..28 unit (NONE/FR/PX/PERCENT), bits 27..0 value
+  (FR/PERCENT Q20.8, PX pixels).
+- Test cards G1-G6 on G3 iMac:
+  G1 (1fr 1fr 1fr): ✓ three equal cells fill row
+  G2 (200px 1fr): ✓ fixed sidebar + flex content (canonical MacTrove
+                    layout — was 50/50 pre-fixes148)
+  G3 (repeat(4, 1fr)): ✓ four equal columns
+  G4 (repeat(3, minmax(100px, 1fr))): ⚠️ cells render side-by-side but
+                    container appears narrower than full width; FR
+                    distribution math holds but intrinsic-width interaction
+                    with minmax() unresolved. Queued as fixes148b.
+  G5 (100px 2fr 1fr): ✓ mixed PX + FR with 2:1 ratio
+  G6 (-macsurf-grid: 3): ✓ V1 syntax still works (separate parser)
+- Trade-offs: minmax min-floor NOT honored (treated as 1fr); 8 tracks max;
+  named-line lists parsed but skipped.
+- Out of scope (deferred to later sprints):
+  - grid-template-rows
+  - grid-row / grid-column / grid-area explicit placement
+  - grid-template-areas
+  - subgrid
+  - auto-flow: dense / column
+  - per-cell align-items / justify-items
+</code></pre>
+<h2>Hardware-verified status (post fixes147)</h2>
+<pre><code class="language-text">CSS 2.1 stacking-context paint order: ✓ Sibling-level
+- fixes147 (2026-05-19): replaces fixes133's 3-pass z walker with
+  CSS 2.1 Appendix E painting order at the sibling level.
+- New html_redraw_box_classify() returns 4-way SC class:
+  NONE / NEG (z&lt;0) / ZERO (z==0 or position:fixed/opacity/transform) /
+  POS (z&gt;0).
+- html_redraw_box_children() does pass-1 classify-and-bucket-all,
+  pass-2 sort neg+pos by z ascending, pass-3 paint in CSS 2.1 order:
+  negative-z → flow → floats → zero-z → positive-z.
+- Stacking-context creation triggers detected:
+  position!=static &amp;&amp; z-index!=auto, position:fixed, opacity&lt;1,
+  non-identity -macsurf-transform / transform.
+- Test cards ZS1-ZS6 in advanced.html all rendering correctly on G3
+  iMac: positive-z sort, NEW negative-z, modal, NEW opacity-creates-SC,
+  NEW transform-creates-SC, z:0-vs-z:auto distinction.
+- MacTrove regression check passes (full home page renders with
+  navigation, logo, image decoders working).
+- KNOWN LIMITATION: cross-level descendant escape not implemented.
+  Positioned descendants of a non-SC parent stay within that parent's
+  flow rather than escaping to the nearest ancestor SC. Per-sibling
+  bucketing only. ~90% of real-world cases covered.
+- Not detected as SC triggers: filter, mix-blend-mode, isolation,
+  will-change. Deferred.
+</code></pre>
+<h2>Hardware-verified status (post fixes146)</h2>
+<pre><code class="language-text">sub-AA glyph-pair overlap: ✓ Fixed
+- fixes144a2 diagnostic: 216 TextWidth comparisons across 4 fonts × 3 sizes
+  × 2 faces × 9 strings; every delta=0. Measurement is internally consistent;
+  the &quot;Di&quot; overlap is a bitmap-resolution artefact at sub-AA sizes.
+- fixes144b: paint-only +1px between glyphs in plotters.c when
+  size &lt; 12 &amp;&amp; font_id != kFontIDMonaco &amp;&amp; mac_len &gt; 1.
+- fixes146: same bump mirrored in macos9_font_measure so multi-segment
+  inline content (body + &lt;code&gt;) doesn't scramble. Mac body text reflows
+  ~chars-1 wider per segment at sub-12pt; trade-off accepted.
+- Gated by MACSURF_SUBAA_DRAW_SPACING at top of plotters.c.
+
+disc list marker: ✓ Fixed
+- fixes143a: U+2022 BULLET → U+00B7 MIDDLE DOT (MacRoman 0xE1 instead of 0xA5).
+  0xA5 in Helvetica TT on G3 rendered as a semicolon-looking glyph in
+  disc's specific size/face context (9pt face 0); square at 0xA5 renders
+  cleanly, so 0xA5 itself isn't broken — disc was a per-context font quirk.
+
+font-family aliases: ✗ Blocked on gui_layout_table family awareness
+- fixes145 attempted per-family dispatch (sans→Helvetica, serif→Times,
+  mono→Monaco). Hardware-rejected as fixes145b — adjacent inline segments
+  on the same line scrambled horizontally because NetSurf's inline layout
+  reserves widths from one-font measurement but the plotter paints each
+  segment with its own metrics.
+- The fixes52 bug class is wider than originally framed: same root cause
+  manifests as horizontal text scrambling, not just vertical line stacking.
+- Architectural gate: macos9_font_width/position/split need family-aware
+  metrics so layout reserves the correct width per inline segment.
+  Plotter-only dispatch is insufficient. Kill switch
+  MACSURF_FONT_FAMILY_ALIASES kept at 0 in plotters.c for the eventual
+  retry once the gui_layout_table work lands.
+</code></pre>
+<h2>Hardware-verified status (post fixes134a)</h2>
+<pre><code class="language-text">viewport units: ✓ Works
+- fixes132 corrected swapped VH/VW conversion in unit.c.
+- Affects height/min-height/width/etc. using vh/vw/vmin/vmax.
+
+min-height: ✓ Works
+- Source audit showed it was already consumed in layout_apply_minmax_height,
+  flex, grid, tables, and replaced/replaced-like paths.
+- Previous status was wrong; the visible failure was caused by swapped vh/vw
+  unit conversion.
+
+z-index: ✓ Partial
+- fixes133 implements basic positioned explicit numeric z-index paint ordering.
+- Positive z-index overlays/dropdowns now paint above normal content.
+- Equal z-index preserves DOM order.
+- Negative z-index and full CSS stacking-context paint order are deferred.
+
+content for ::before / ::after: ✓ string + counter()
+- fixes134a + fix1 materialize STRING items as BOX_TEXT under an
+  INLINE_CONTAINER wrapper. CSS_CONTENT_SET guard prevents the fixes37
+  uninitialised-c_item hang.
+- fix1 reuses an existing trailing INLINE_CONTAINER for ::after so the
+  generated content renders inline-adjacent to the element text instead
+  of dropping to a new line.
+- Still skipped without crashing: URI, ATTR, COUNTERS (plural),
+  open/close-quote items.
+
+CSS counters: ✓ flat decimal
+- fixes134b adds counter-reset, counter-increment, content: counter(name).
+- Flat document-scope table on box_construct_ctx. Element NORMAL
+  counter-reset/increment fires before ::before; pseudo's own
+  counter-reset/increment fires inside box_construct_generate before
+  content materialises.
+- Decimal output only. counters(name, &quot;.&quot;) plural form, roman/alpha
+  styles, nested CSS counter scopes deferred.
+</code></pre>
+<h2>fixes132 revision</h2>
+<p>The original audit claimed <code>min-height</code> was &quot;NOT consumed in layout&quot;. A direct source audit refuted this: <code>layout_apply_minmax_height</code> (layout.c:2165) calls <code>ns_computed_min_height</code> and applies it via two sites in <code>layout_block_context</code> (layout.c:4031, 4089). Flex (layout_flex.c:1360-1362), grid (layout_grid.c:432-434), tables (layout.c:2086), and replaced elements (layout.c:175-178) also honor it. The user-visible &quot;min-height collapses&quot; symptom was actually a <strong>VH/VW swap in <code>css_unit__px_per_unit</code></strong> (unit.c:271-275): <code>CSS_UNIT_VH</code> was returning <code>viewport_width/100</code> and <code>CSS_UNIT_VW</code> was returning <code>viewport_height/100</code>. The same file's <code>css_unit__absolute_len2pt</code> (lines 107-113) had them correct, so the bug was internal inconsistency, not a missing case. Swapped back in fixes132. This also fixes <code>height: 100vh</code>, <code>width: 100vw</code>, <code>vmin</code>, <code>vmax</code>, and any other viewport-unit property — they all routed through the broken <code>px_per_unit</code> path.</p>
+<hr />
+<h2>The honest summary</h2>
+<p>MacSurf parses <strong>167 CSS properties</strong> via libcss. The layout/redraw pipeline only <strong>reads 87 of them</strong>. The gap between &quot;parsed&quot; and &quot;consumed&quot; is where modern pages fall apart visually — libcss correctly computes the cascade, but the layout engine never asks for the value, so the property does nothing.</p>
+<p>Of the 87 consumed properties, <strong>most work</strong>, but a handful are partial (limits or accuracy gaps), and several depend on subsystems (font selection, color resolution) that have their own gaps.</p>
+<hr />
+<h2>What actually works on real pages</h2>
+<p>These have been verified on hardware or in screenshots and produce the correct visual result:</p>
+<h3>Box model</h3>
+<ul>
+<li><code>width</code>, <code>height</code>, <code>min-width</code>, <code>max-width</code>, <code>max-height</code></li>
+<li><code>margin</code> (all sides, <code>auto</code> centering)</li>
+<li><code>padding</code> (all sides)</li>
+<li><code>border-width</code>, <code>border-color</code>, <code>border-style</code> (all sides)</li>
+<li><code>border-radius</code> (rounded corners via <code>PaintRoundRect</code>/<code>FrameRoundRect</code> — fixes172)</li>
+<li><code>box-sizing</code></li>
+<li><code>box-shadow</code> (independent h/v offsets + custom colour — fixes175/178)</li>
+</ul>
+<h3>Display &amp; positioning</h3>
+<ul>
+<li><code>display: block | inline | inline-block | none | flex | inline-flex | grid | table | table-cell | table-row | list-item</code></li>
+<li><code>position: static | relative | absolute | fixed</code></li>
+<li><code>top</code>, <code>right</code>, <code>bottom</code>, <code>left</code></li>
+<li><code>float: left | right | none</code></li>
+<li><code>clear: left | right | both | none</code></li>
+<li><code>visibility: visible | hidden</code></li>
+<li><code>z-index: &lt;integer&gt;</code> (CSS 2.1 sibling-level paint order with neg/zero/pos buckets, SC triggers for position+z/fixed/opacity/transform — fixes147)</li>
+</ul>
+<h3>Flexbox</h3>
+<ul>
+<li><code>flex-direction: row | row-reverse | column | column-reverse</code></li>
+<li><code>flex-wrap: nowrap | wrap | wrap-reverse</code></li>
+<li><code>flex-grow</code>, <code>flex-shrink</code>, <code>flex-basis</code></li>
+<li><code>justify-content: flex-start | flex-end | center | space-between | space-around | space-evenly</code></li>
+<li><code>align-content</code> (all values)</li>
+<li><code>align-items</code>, <code>align-self</code></li>
+<li><code>order</code> (stable bubble-sort before layout)</li>
+<li><code>gap: N</code> single-value (both axes get N)</li>
+<li><code>column-gap: N</code></li>
+</ul>
+<h3>Grid (V1 — fixes75 + fixes118)</h3>
+<ul>
+<li><code>display: grid</code></li>
+<li><code>-macsurf-grid: N</code> (MacSurf shorthand for N equal columns)</li>
+<li><code>grid-template-columns: &lt;length-list&gt;</code> (real track widths — fixes118)</li>
+</ul>
+<h3>Typography</h3>
+<ul>
+<li><code>color</code></li>
+<li><code>font-family</code> (name match: Geneva, Monaco, Chicago, Charcoal)</li>
+<li><code>font-size</code></li>
+<li><code>font-weight: normal | bold</code> (via QuickDraw <code>face=1</code> bold smear)</li>
+<li><code>font-style: normal | italic</code> (via QuickDraw <code>face=2</code>)</li>
+<li><code>text-align: left | right | center | justify</code></li>
+<li><code>text-decoration: underline | overline | line-through</code></li>
+<li><code>text-indent</code></li>
+<li><code>text-transform: uppercase | lowercase | capitalize | none</code></li>
+<li><code>line-height</code></li>
+<li><code>letter-spacing</code></li>
+<li><code>word-spacing</code> (length values; layout + paint in sync — fixes139b)</li>
+<li><code>white-space: normal | nowrap | pre</code></li>
+<li><code>vertical-align</code></li>
+</ul>
+<h3>Backgrounds</h3>
+<ul>
+<li><code>background-color</code></li>
+<li><code>background-image: url(...)</code> (PNG/GIF/BMP/TIFF/JPEG via lodepng + QT — fixes78-79b)</li>
+<li><code>background-position</code></li>
+<li><code>background-repeat</code> (repeat / repeat-x / repeat-y / no-repeat all honored by macos9 plot_bitmap tile loop — fixes138)</li>
+<li><code>background-attachment: fixed</code> (viewport-anchored origin + tiles parallax-correct against fixes138 — fixes137 + fixes138)</li>
+<li><code>-macsurf-gradient: linear-gradient(...)</code> (multi-stop — fixes49)</li>
+<li><code>-macsurf-gradient: radial-gradient(...)</code> (24-ring oval stack — fixes74d)</li>
+</ul>
+<h3>Lists &amp; content</h3>
+<ul>
+<li><code>list-style-type</code> (disc/circle/square/decimal). <strong>fixes143a (2026-05-19):</strong> disc marker switched from U+2022 BULLET (→ MacRoman 0xA5, which Helvetica TT on G3 rendered as a semicolon-looking glyph) to U+00B7 MIDDLE DOT (→ MacRoman 0xE1, a different font slot that renders as a clean small dot). Circle stays as ASCII 'o' (no hollow-circle glyph in MacRoman). Square still uses MacRoman 0xA5 and may show the same artefact; if so, swap to ASCII fallback in a follow-up.</li>
+<li><code>list-style-image</code></li>
+<li><code>content</code> for <code>::before</code> / <code>::after</code> pseudo-elements
+<ul>
+<li>string items (fixes134a)</li>
+<li>decimal <code>counter(name)</code> items (fixes134b/d)</li>
+<li><code>open-quote</code> / <code>close-quote</code> / <code>no-open-quote</code> / <code>no-close-quote</code> with document-scope depth tracking (fixes140a)</li>
+</ul>
+</li>
+<li><code>quotes</code> list (fixes140b); UA defaults wrap <code>&lt;q&gt;</code> in curly typographic quotes via the macos9 resource CSS (fixes140c)</li>
+</ul>
+<h3>Custom &amp; visual</h3>
+<ul>
+<li>CSS Custom Properties / <code>var()</code> — full native resolution (fixes133-139)</li>
+<li><code>opacity</code> (QuickDraw stipple pattern at 1.0/0.80/0.50/0.25)</li>
+<li><code>cursor</code> parsed; on hover, the cursor changes via <code>SetThemeCursor</code> (fixes131)</li>
+<li><code>outline</code>, <code>outline-color</code>, <code>outline-style</code>, <code>outline-width</code> (parsed and consumed in redraw)</li>
+<li><code>clip</code> (CSS 2 <code>clip: rect(...)</code>)</li>
+<li><code>-macsurf-transform: rotate() translate() scale()</code> (fixes73)</li>
+<li><code>-macsurf-text-shadow</code> (fixes50)</li>
+<li><code>object-fit: fill | contain | cover | none | scale-down</code> (fixes116)</li>
+<li><code>overflow: visible | hidden | scroll | auto</code> (clipping applies on block / inline-block / table-cell / flex / inline-flex / grid — fixes131 added flex/grid)</li>
+<li><code>border-collapse</code>, <code>border-spacing</code> (tables)</li>
+</ul>
+<h3>Pseudo-classes (fixes130 + fixes130e)</h3>
+<ul>
+<li><code>:hover</code> (re-cascade on mouse-track)</li>
+<li><code>:active</code></li>
+<li><code>:focus</code></li>
+<li>(Static pseudo-classes always worked: <code>:first-child</code>, <code>:nth-child(n)</code>, etc. via libcss selector engine)</li>
+</ul>
+<hr />
+<h2>What is PARSED but NOT CONSUMED (the silent-fail category)</h2>
+<p>These accept author CSS without complaint but have zero effect on rendering. Every one of these is a probable visual bug on real pages.</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Parsed</th>
+<th>Layout reads?</th>
+<th>Redraw reads?</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>background-attachment</code></td>
+<td>yes</td>
+<td>no</td>
+<td><strong>yes (fixes137 + fixes138)</strong></td>
+<td>viewport anchor + repeating tile parallax both shipped. Gradient-fixed deferred.</td>
+</tr>
+<tr>
+<td><code>caption-side</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td><strong>Audited fixes139: deferred.</strong> <code>&lt;caption&gt;</code> maps to <code>BOX_INLINE</code> in <code>box_construct.c:139</code>; no <code>BOX_TABLE_CAPTION</code> type exists. Proper support requires new box type + normalise rewrite + table-layout sibling placement. Multi-file structural change, not a minimal round.</td>
+</tr>
+<tr>
+<td><code>column-count</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>multi-column text layout broken. Deferred — text-balancing across columns is genuinely complex.</td>
+</tr>
+<tr>
+<td><code>column-fill</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>depends on column-count</td>
+</tr>
+<tr>
+<td><code>column-rule-*</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>depends on column-count</td>
+</tr>
+<tr>
+<td><code>column-span</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>depends on column-count</td>
+</tr>
+<tr>
+<td><code>column-width</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>depends on column-count</td>
+</tr>
+<tr>
+<td><code>quotes</code></td>
+<td>yes</td>
+<td>no</td>
+<td><strong>yes (fixes140b)</strong></td>
+<td>resolved at generated-content materialisation; depth-indexed open/close strings emitted from <code>content: open-quote / close-quote</code></td>
+</tr>
+<tr>
+<td><code>empty-cells</code></td>
+<td>yes</td>
+<td>no</td>
+<td><strong>yes (fixes139a)</strong></td>
+<td>show/hide both honored; hidden empty cells skip background + border paint while keeping their layout slot</td>
+</tr>
+<tr>
+<td><code>table-layout</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td><strong>Audited fixes139: deferred.</strong> 1064 lines of dedicated table.c + table integration in layout.c. Too risky for one round per sprint rule &quot;do not destabilize all table layout&quot;.</td>
+</tr>
+<tr>
+<td><code>unicode-bidi</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>bidi text</td>
+</tr>
+<tr>
+<td><code>writing-mode</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>vertical-writing pages broken</td>
+</tr>
+<tr>
+<td><code>word-spacing</code></td>
+<td>yes</td>
+<td><strong>yes (fixes139b)</strong></td>
+<td><strong>yes (fixes139b)</strong></td>
+<td>length values shift word gaps; layout and paint both updated so wrap point follows</td>
+</tr>
+<tr>
+<td><code>break-after</code>, <code>break-before</code>, <code>break-inside</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>print/column breaks</td>
+</tr>
+<tr>
+<td><code>page-break-*</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>print breaks</td>
+</tr>
+<tr>
+<td><code>orphans</code>, <code>widows</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>print typography</td>
+</tr>
+<tr>
+<td><code>fill-opacity</code>, <code>stroke-opacity</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>SVG-only, low priority</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Highest-impact silent fails on real pages, ranked:</strong></p>
+<ol>
+<li><s><strong><code>background-attachment: fixed</code></strong></s> <strong>Shipped at fixes137 + fixes138 (2026-05-19).</strong> Viewport-anchored origin + repeating-tile parallax both work end-to-end. Gradient-fixed still deferred.</li>
+<li><s><strong><code>empty-cells</code></strong></s> <strong>Shipped at fixes139a (2026-05-19).</strong> Hidden empty cells skip background + border paint; cell still occupies its layout slot. Truly empty cells (no children, no text) and ASCII-whitespace-only cells are treated as empty. <code>&amp;nbsp;</code> is treated as visible content matching Chrome/Firefox/Safari behavior (the test's <code>html_box_table_cell_is_empty</code> checks raw UTF-8 bytes and U+00A0 encodes as <code>0xC2 0xA0</code>, whose leading <code>0xC2</code> correctly disqualifies the cell from emptiness — spec phrasing is ambiguous on NBSP, but real-browser behavior is unanimous).</li>
+<li><s><strong><code>word-spacing</code></strong></s> <strong>Shipped at fixes139b (2026-05-19).</strong> Length values resolve through the same plot_font_style_t field as letter-spacing; macos9_font_measure counts ASCII spaces and updates the wrap point so layout and paint agree.</li>
+<li><strong><code>column-count</code></strong> — Magazine-style multi-column text. Deferred — text-balancing across columns is genuinely complex.</li>
+<li><strong><code>caption-side</code></strong> — Audited fixes139, <strong>deferred</strong>. Captions currently fall through as BOX_INLINE because no BOX_TABLE_CAPTION type exists in this fork. Real support needs box_construct + box_normalise + table-layout coordination.</li>
+<li><strong><code>table-layout</code></strong> — Audited fixes139, <strong>deferred</strong>. 1064 lines of dedicated table layout code; the sprint rule &quot;do not destabilize all table layout&quot; forbids a one-round attempt.</li>
+</ol>
+<p>(<code>min-height</code> and viewport units were previously listed here. Both shipped in fixes132. <code>z-index</code> shipped in fixes133. <code>counter-increment</code> / <code>counter-reset</code> shipped in fixes134b — see &quot;What actually works&quot; section.)</p>
+<hr />
+<h2>What is BROKEN or PARTIAL on consumed properties</h2>
+<h3><code>gap: A B</code> two-value form (fixes148 limitation)</h3>
+<p>Single-value <code>gap: N</code> works (both axes get N). Two-value <code>gap: A B</code> loses A and stores only B as column-gap. Fix requires adding <code>CSS_PROP_ROW_GAP</code> as an independent property with its own bit slot in <code>css_computed_style_i.bits[]</code>. Bit budget audit shows word 15 has 27 free bits, word 14 bottom 5 bits are full. ~17 files to touch. Real-world impact: 97% of MacTrove pages use single-value form, deferred.</p>
+<h3><code>font-family</code> matching</h3>
+<p>Currently only matches <code>Geneva</code>, <code>Monaco</code>, <code>Chicago</code>, <code>Charcoal</code> by name. Any other family name falls through to the OS 9 default font for the resolved generic. Modern sites specifying <code>&quot;Helvetica Neue&quot;, system-ui, sans-serif</code> get the system font, not their preferred. Not strictly broken — there are no other fonts installed by default — but the matching is narrow.</p>
+<h3><code>font-weight</code> granularity</h3>
+<p>Only <code>bold</code> (&gt;= 600) vs <code>normal</code> (&lt; 600). Numeric weights 100/200/300/400/500/600/700/800/900 all collapse to two values. Acceptable for QuickDraw which only has bold/non-bold.</p>
+<h3><code>text-overflow: ellipsis</code></h3>
+<p><strong>fixes135a + fixes135c (2026-05-19): WORKS on hardware.</strong> Parser/cascade/computed plumbing in 135a; visual paint-after rendering in 135c, accepted on G3. The 135c architecture paints the ellipsis as a separate overlay: the original text draws normally (overflow:hidden clips at the container edge), then a background-coloured rect followed by a <code>…</code> text call paints over the rightmost slice. Avoids the text-buffer-mutation bug that broke the earlier fixes135b attempt. The macos9 plot_text path folds U+2026 to MacRoman 0xC9 (<a href="browser/netsurf/frontends/macos9/macos9_font.c#L109">macos9_font.c:109</a>) so the same three UTF-8 bytes render correctly. Deferred to V2: multi-line ellipsis, two-value form (<code>text-overflow: clip ellipsis</code>), custom string marker, RTL/start-side ellipsis, ellipsis across complex nested inline boxes.</p>
+<h3><code>word-break</code> / <code>overflow-wrap</code> / <code>word-wrap</code></h3>
+<p><strong>fixes136a (2026-05-19): plumbing accepted. fixes136b deferred.</strong></p>
+<p>Parsed/computed status:</p>
+<ul>
+<li><code>word-break: normal | break-all | keep-all</code> — parses, computes correctly.</li>
+<li><code>overflow-wrap: normal | break-word | anywhere</code> — parses, computes correctly.</li>
+<li><code>word-wrap: break-word</code> — parses as a legacy alias for <code>overflow-wrap</code>.</li>
+<li>Invalid values fall back to <code>normal</code>. <code>css_computed_word_break()</code> and <code>css_computed_overflow_wrap()</code> return the right enum.</li>
+<li><code>keep-all</code> is parsed for forward-compat but inert without CJK segmentation. <code>anywhere</code> aliases to <code>break-word</code> semantically.</li>
+</ul>
+<p><strong>Current layout behaviour (intentional deviation from spec).</strong> MacSurf's inline layout already performs emergency character-boundary wrapping for long unbreakable runs even when the author has not set <code>overflow-wrap: break-word</code>. <a href="browser/netsurf/frontends/macos9/macos9_font.c#L310">macos9_font_split</a> line 352-364: if no space character fits in the available width, it hard-breaks at the next character boundary. This matches the practical effect of <code>overflow-wrap: break-word</code> / <code>word-break: break-all</code> for URLs and hashes, but does <strong>not</strong> yet distinguish strict <code>normal</code> vs <code>break-word</code> vs <code>break-all</code> semantics. Hardware-confirmed at fixes136a: long URLs and 64-char hash tokens wrap mid-character without needing any author CSS.</p>
+<p>A strict-spec fixes136b that disables this hard-break for <code>overflow-wrap: normal</code> was considered and rejected: real pages do not explicitly opt into <code>break-word</code>, so making <code>normal</code> strict would horizontally overflow every long URL or hash that authors haven't pre-formatted. Practical readability wins over spec strictness. The libcss plumbing still pays off when a future caller (e.g. a CSS reset that wants strict non-breaking, or richer line-break logic for <code>break-all</code>'s aggressive mode) needs to read the computed value.</p>
+<p>If a real page later breaks because the default is too aggressive, fixes136b can revisit a narrower change: make <code>overflow-wrap: normal</code> + <code>word-break: normal</code> together signal &quot;do not character-break&quot;, while leaving every other combination on the friendly default.</p>
+<h3><code>clip-path</code> and <code>mask</code></h3>
+<p>Not implemented. Decorative shape clipping silently ignored. Pages degrade to rectangular fallback (usually fine).</p>
+<h3><code>transition</code> and <code>animation</code></h3>
+<p>Deferred to v0.4.5 (already noted in CLAUDE.md). MacSurf has a one-shot <code>-macsurf-animation-rotate</code> extension but no real CSS animation property support.</p>
+<h3>Bitmap rendering</h3>
+<ul>
+<li>PNG transparency: 1-bit <code>CopyMask</code> threshold (anti-aliased edges become binary)</li>
+<li>TIFF: opaque rendering only (<code>QTNewGWorld(k32ARGBPixelFormat)</code> returns <code>cDepthErr -157</code> on OS 9)</li>
+<li>Path A1.5 (<code>CopyDeepMask</code> + 8-bit mask) is queued</li>
+</ul>
+<h3><s>List bullets render as <code>;</code></s> — fixes143a (2026-05-19)</h3>
+<p>Disc marker switched from U+2022 BULLET (MacRoman 0xA5) to U+00B7 MIDDLE DOT (MacRoman 0xE1). The bullet glyph slot at 0xA5 in Helvetica TT on the user's G3 was rendering as a semicolon-looking artefact; middle dot uses a different font slot (0xE1) that renders cleanly. Cause is specific to disc's size/face context (9pt face 0) — square uses 0xA5 and renders correctly, so 0xA5 itself isn't broken.</p>
+<h3><s>&quot;Di&quot;-class glyph-pair overlap in Helvetica TT at body size</s> — fixes144b + fixes146 (2026-05-19)</h3>
+<p>Sub-AA bitmap rendering at 9-10pt had no anti-aliased transition pixel between adjacent glyphs, so the D's painted right edge and the i's body landed in adjacent or shared pixel columns. fixes144b adds +1px between glyphs in the draw path (paint-only) when <code>size &lt; 12 &amp;&amp; font_id != kFontIDMonaco &amp;&amp; mac_len &gt; 1</code>. fixes146 mirrors the same bump in <code>macos9_font_measure</code> so multi-segment inline content doesn't scramble (the draw-vs-measure asymmetry from fixes144b alone caused horizontal overlap between adjacent inline segments). Trade-off accepted: MacTrove body text reflows ~chars-1 wider per segment at sub-12pt. Gated by <code>MACSURF_SUBAA_DRAW_SPACING</code> at top of plotters.c (sync the same flag manually in macos9_font.c if flipped).</p>
+<h3>Inline boxes occasionally duplicate</h3>
+<p>Known issue post-fixes33. Some inline-box runs render twice. Not blocking comprehension; cause unknown.</p>
+<h3>URL bar input on initial window</h3>
+<p>Probably fixed by fixes77g, needs verification. Workaround: File → New Window.</p>
+<hr />
+<h2>Implementation priorities</h2>
+<p>Ranked by current visual impact on real-world pages, after the
+fixes132–fixes140 sprint sequence. The shipped backlog is folded
+into <a href="#what-actually-works-on-real-pages">What actually works on real pages</a>;
+this section only lists outstanding work.</p>
+<h3>Q1 — Standard <code>transform</code> property bridge (LOW–MEDIUM impact, LOW effort) — <strong>fixes141 ATTEMPTED + REVERTED</strong></h3>
+<p>MacSurf consumes its private <code>-macsurf-transform</code>; modern pages emit
+the standard <code>transform: rotate() translate() scale()</code>. A small
+bridge would route standard <code>transform</code> through the existing
+fixes73 plotter, picking up real-page CSS without any new layout
+or paint code.</p>
+<p><strong>fixes141 attempted this</strong> as a parser-level alias mirroring the
+<code>word-wrap</code> → <code>overflow-wrap</code> pattern (new propstring entry +
+SMAP entry + property_handlers entry pointing at
+<code>css__parse_macsurf_transform</code>). On hardware the build still ran
+but every page that referenced standard <code>transform: ...</code> hung the
+Mac just before the first reformat (log truncates at
+<code>content broadcast READY</code>, no <code>reformat:</code> lines fire). The
+simplified test page (inline-block, no flex) crashed identically.
+Reverted in the same round.</p>
+<p><strong>Hypotheses for future investigation:</strong></p>
+<ol>
+<li>The parser is reentrant-unsafe when called for two different
+prop indices (TRANSFORM and MACSURF_TRANSFORM in the same
+ruleset).</li>
+<li>A select-side dispatch table indexed by FIRST_PROP–LAST_PROP
+range is sized statically somewhere outside the explicit
+property_handlers/propstrings arrays.</li>
+<li>The bytecode emitted with <code>CSS_PROP_MACSURF_TRANSFORM</code> opcode
+but reached via a different <code>parser_handlers[]</code> slot index
+confuses something in the deferred <code>var()</code> resolution path.</li>
+</ol>
+<p>Next attempt should add MS_LOG instrumentation <strong>before</strong> shipping,
+and bisect against an even more minimal page (single inline <code>&lt;span style=&quot;transform: rotate(10deg)&quot;&gt;</code> against <code>&lt;span style=&quot;-macsurf-transform: ...&quot;&gt;</code>).</p>
+<h3>Q2 — Full-fidelity two-value <code>gap: A B</code> (LOW impact, MEDIUM effort)</h3>
+<p>Currently single-value <code>gap: N</code> and standalone <code>row-gap: N</code> work;
+two-value <code>gap: A B</code> collapses A to column-gap. Splitting row-gap
+into its own bit slot is ~17 files of cross-cutting plumbing.
+Real-world impact is small.</p>
+<h3>Q3 — <code>caption-side: top | bottom</code> (MEDIUM impact, HIGH effort)</h3>
+<p>Audited at fixes139. <code>&lt;caption&gt;</code> currently maps to <code>BOX_INLINE</code> in
+<code>box_construct.c:139</code>; no <code>BOX_TABLE_CAPTION</code> type exists. Real
+support needs a new box type, normalise rewrite, and table-layout
+sibling placement. Structural change, not a minimal round.</p>
+<h3>Q4 — <code>table-layout: fixed</code> (MEDIUM impact, HIGH effort)</h3>
+<p>Audited at fixes139. 1064 lines of dedicated table layout in
+<code>table.c</code> plus table integration in <code>layout.c</code>. Per sprint rule
+&quot;do not destabilize all table layout&quot;, deferred until a
+contained-scope follow-up audit finds a tractable seam.</p>
+<h3>Q5 — <code>column-count</code> / <code>column-rule-*</code> / <code>column-gap</code> (LOW–MEDIUM impact, HIGH effort)</h3>
+<p>Multi-column text layout. Genuinely complex — text balancing,
+column breaks, orphan/widow handling. Defer until proven needed
+on a real page.</p>
+<h3>Q6 — Strict <code>word-break: break-all</code> / <code>overflow-wrap: normal</code> (LOW impact)</h3>
+<p>Plumbing landed in fixes136a; layout currently always allows
+character-boundary breaks on long unbreakable runs because real
+pages benefit. A strict mode that respects <code>overflow-wrap: normal</code>
+is parked behind &quot;show me a real page where this matters&quot; because
+flipping the default would regress every URL-heavy page that
+doesn't explicitly opt in.</p>
+<h3>Q7 — <code>transition</code> / <code>animation</code> (v0.4.5+)</h3>
+<p>Animation framework would touch event loop, paint scheduling, time
+tracking. Substantial scope. Defer to v0.4.5.</p>
+<h3>Q8 — <code>clip-path</code>, <code>mask</code>, <code>filter</code> (LOW impact, HIGH effort)</h3>
+<p>Decorative. Pages degrade to rectangular fallback which is
+acceptable. Defer indefinitely.</p>
+<hr />
+<h2>Test plan</h2>
+<p>Without dedicated regression tests, every CSS round needs a real-page verification step. Suggested gauntlet:</p>
+<ol>
+<li><strong><code>tests/css/z_index.html</code></strong> — three boxes with overlapping <code>position: absolute</code> and explicit z-index — paint order should match z-index, not DOM order.</li>
+<li><strong><code>tests/css/min_height.html</code></strong> — a <code>div</code> with <code>min-height: 300px</code> containing one short line of text — should be 300px tall.</li>
+<li><strong><code>tests/css/text_overflow.html</code></strong> — card with <code>width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap</code> and 500px of text — should show <code>Very long title…</code></li>
+<li><strong><code>tests/css/viewport_units.html</code></strong> — full-screen hero with <code>height: 100vh</code> — should fill the viewport.</li>
+<li><strong><code>tests/css/counters.html</code></strong> — <code>&lt;h2&gt;</code> styled with <code>counter-increment</code> and <code>content: counter(...)</code> — should auto-number.</li>
+<li><strong>Real-page regression: MacTrove home, MacTrove app page, DuckDuckGo Lite, Wikipedia article</strong> — visual diff against previous shipped state.</li>
+</ol>
+<hr />
+<h2>Out-of-CSS items affecting page rendering</h2>
+<p>These are not CSS properties but affect whether pages &quot;load properly&quot;:</p>
+<ol>
+<li><strong>HTTP fetcher reliability</strong> — fixes98-105 closed the major leaks; current state is stable across many-page browsing.</li>
+<li><strong>TLS</strong> — handled by proxy (out of scope for the browser).</li>
+<li><strong>JavaScript</strong> — Duktape ES5 in base build; modern JS still needs proxy render-and-flatten.</li>
+<li><strong>Forms</strong> — <code>&lt;input&gt;</code> rendering works; form submission path is wired. Style cascade reaches form controls.</li>
+<li><strong>Tables</strong> — table layout works for simple tables; complex tables (colspan/rowspan with auto-layout) may have gaps.</li>
+</ol>
+<hr />
+<h2>What I would ship next</h2>
+<p>After fixes132–fixes147, the remaining ranked top picks are:</p>
+<p><strong>Stacking contexts (fixes147) shipped at sibling level — closed.</strong> Cross-level descendant escape deferred until a structural paint pipeline rewrite. ~90% of real-page cases covered today.</p>
+<p><strong>Highest-impact remaining structural work, two candidates:</strong></p>
+<ol>
+<li>
+<p><strong>Full CSS Grid V2.</strong> Current V1 (<code>-macsurf-grid: N</code> from fixes75) only fires when authors opt in to our extension. Real <code>grid-template-columns: 1fr 200px repeat(3, minmax(100px, 1fr))</code>, <code>grid-template-rows</code>, <code>grid-template-areas</code>, explicit <code>grid-row</code> / <code>grid-column</code> / <code>grid-area</code>. Track-widths architecture is partially proved at fixes118 (outer-struct arena pattern); the remaining work is the grammar parser + auto-placement algorithm + named-area lookup. 2-3 sprints. <strong>Biggest absolute transformation</strong> of how modern sites render.</p>
+</li>
+<li>
+<p><strong><code>gui_layout_table</code> family awareness.</strong> Architectural prerequisite for retrying font-family aliases (fixes145) without the inline-scramble bug. <code>macos9_font_width</code> / <code>macos9_font_position</code> / <code>macos9_font_split</code> need to return widths consistent with whichever family the plotter would pick. Once shipped, fixes145 retry becomes safe and pages render with real serif/mono families. Doesn't directly fix any layout bug but unblocks every future font-related win.</p>
+</li>
+</ol>
+<p><strong>Stacking-context cross-level descendant walk</strong> as a fixes147 follow-up is the third candidate but lower priority — the per-sibling model already covers the dominant real-page cases. Would require collecting all positioned descendants from a stacking-context root and partitioning them into the appropriate bucket regardless of intermediate non-SC ancestors. Structural rewrite of the <code>html_redraw_box</code> / <code>html_redraw_box_children</code> separation.</p>
+<p><strong>Other structural items still queued:</strong></p>
+<ul>
+<li>Q3 <code>caption-side</code> (high effort, structural change — new BOX_TABLE_CAPTION type)</li>
+<li>Q4 <code>table-layout: fixed</code> (high effort, 1064-line table.c port)</li>
+<li>Q5 multi-column (<code>column-count</code> family — high effort)</li>
+<li>Q6 strict <code>word-break</code> (low impact, parked)</li>
+<li>Q7 <code>transition</code> / <code>animation</code> (v0.4.5+ — large scope)</li>
+<li>Q8 <code>clip-path</code> / <code>mask</code> / <code>filter</code> (deferred indefinitely)</li>
+</ul>
+<p>Q1 (standard <code>transform</code> bridge) is on hold pending the MS_LOG bisect against fixes141's pre-<code>reformat:</code> hang. Q2 (full-fidelity two-value <code>gap: A B</code>) is parked behind ~17-file cross-cutting plumbing for marginal real-world impact.</p>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

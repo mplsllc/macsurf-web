@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cross-dev from Linux — MacSurf</title>
+<meta name="description" content="MacSurf cross-development from Linux using Retro68 for fast syntax checks against PowerPC GCC.">
+<link rel="canonical" href="https://macsurf.org/cross-dev.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html" class="active">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Linux cross-dev</div>
+    <h1>Cross-dev from Linux</h1>
+    <p class="lede">The cross-compile-clean workflow: Retro68 syntax checks on Linux, then SCP the patch to the Mac for the real CodeWarrior build.</p>
+    <p>Everything I've learned about shipping Mac OS 9 code from a Linux desktop, plus the round-trip workflow that produced fixes 100+ through 151.</p>
+<p>The platform is unusual enough that a lot of this isn't written down anywhere else. This doc is the survival kit.</p>
+<hr />
+<h2>1. Platform constraints (what runs on the Mac)</h2>
+<h3>Compiler</h3>
+<p>CodeWarrior 8 Pro (with 8.3 update) on Mac OS 9. <strong>Strict C89.</strong> Hard restrictions worth tattooing on your forearm:</p>
+<ul>
+<li>No <code>inline</code> keyword (define it away: <code>-Dinline=</code>)</li>
+<li>No <code>//</code> line comments</li>
+<li>No variadic macros — but <code>__VA_ARGS__</code> is supported as a pre-C99 extension and is the safe path for NSLOG-style no-op macros</li>
+<li>No forward enum declarations (<code>enum foo;</code> is illegal)</li>
+<li>No C99 designated initializers (<code>{ .field = value }</code>)</li>
+<li>No for-scope variable declarations (<code>for (int i = ...)</code>)</li>
+<li>No compound literals</li>
+<li>No <code>restrict</code>, <code>long long</code> is technically supported but <strong>miscompiled</strong> (see §3)</li>
+<li>No GNU union casts (<code>(union_type)0</code>) — use a compound statement with a local variable</li>
+<li>All variables at the top of their enclosing block</li>
+</ul>
+<p>C89 also rejects named enums inside struct bodies — CW8 silently fails to complete the struct, leaving it incomplete and every member undefined. Hoist named enums above any struct that uses them.</p>
+<h3>Bit-pack scalar fields, but watch padding</h3>
+<p><code>css_computed_style_i</code> (libcss inner struct) gets <code>memcmp</code>'d by arena interning to deduplicate styles. <strong>Any new field's byte representation must be deterministic across every cascade path.</strong> This means:</p>
+<ul>
+<li>A <code>uint8_t</code> between two <code>int32_t</code> creates 3 padding bytes the compiler chooses; cascade code writes the byte but nobody writes the padding. Different code paths can leave the padding with different values → memcmp false-negatives → intern table fills with duplicates → use-after-free during style destroy. <strong>Use <code>int32_t</code> for scalar fields in <code>_i</code> so they self-align.</strong> This is fixes117 (inline track array crash) and fixes151b (uint8 field crash) — the same trap twice.</li>
+<li>Variable-size data (track arrays, content arrays, font-family lists) goes in the OUTER <code>css_computed_style</code>, not in <code>_i</code>. Add a dedicated <code>arena__compare_*</code> function for it. fixes118 documented this pattern; fixes150 reused it for row tracks.</li>
+</ul>
+<h3>Carbon CFM app requirements</h3>
+<ul>
+<li><strong><code>'carb'</code> resource is mandatory.</strong> Without it, CarbonLib never loads, and any <code>*InContext</code> Open Transport call crashes inside OTClientLib at a fixed address. Ship <code>MacSurf.rsrc</code> (a pre-built binary resource fork; CW8 links <code>.rsrc</code> into the output with no Rez step) and list it in the project.</li>
+<li>Skip <code>InitGraf</code> / <code>InitFonts</code> / <code>InitWindows</code> / <code>InitMenus</code> / <code>TEInit</code> / <code>InitDialogs</code> under Carbon. Keep <code>InitCursor()</code> and <code>FlushEvents(everyEvent, 0)</code>.</li>
+<li>Call <code>RegisterAppearanceClient()</code> after <code>InitCursor()</code>, gated by a Gestalt check.</li>
+<li>No <code>kWindowStandardHandlerAttribute</code> on <code>CreateNewWindow</code> — it intercepts updateEvts and leaves windows blank.</li>
+</ul>
+<h3>Open Transport rules</h3>
+<ul>
+<li>Use plain <code>OTOpenEndpoint</code> / <code>InitOpenTransport</code>, <strong>not</strong> the <code>*InContext</code> variants. Every CarbonLib crash we've debugged has traced to InContext routing through OTClientLib in an uninitialized state.</li>
+<li><code>OTUseSyncIdleEvents(ep, true)</code> plus a notifier that calls <code>YieldToAnyThread()</code> on <code>kOTSyncIdleEvent</code> — this is how synchronous OT calls cooperate with the rest of the app.</li>
+<li>Carbon CFM cannot do passive (listening) OT binds. The OS rejects it categorically; we verified across 14 rounds in macSSL before pivoting. Don't try to write a local server.</li>
+</ul>
+<h3>No preemptive threads</h3>
+<p>OS 9 is cooperative multitasking. Run a <code>WaitNextEvent</code> UI loop. Long-running work yields via <code>YieldToAnyThread()</code> or by returning to WNE.</p>
+<h3>Memory partition</h3>
+<p>Carbon partition must be <strong>at least 16 MB preferred / 8 MB minimum</strong>. libcss allocates via raw <code>malloc</code>/<code>calloc</code> with no NetSurf wrapper — a 4 MB partition (the CW8 default) starves the CSS cascade on real pages. Set via <code>MWProject_PPC_size</code> / <code>MWProject_PPC_minsize</code> in the <code>.mcp</code> XML.</p>
+<h3>CW8 PPC long-long codegen is broken</h3>
+<p><code>(long long)a * small_const</code> writes <code>a &gt;&gt; log2(const)</code> into the high word instead of <code>(a * const) &gt;&gt; 32</code>. Confirmed on real hardware via probe G (fixes113): <code>(long long)131072 * 1024LL</code> produced <code>hi=128, lo=134217728</code> instead of the correct full product 549,890,031,616.</p>
+<p><strong>Mitigation:</strong> for any 64-bit fixed-point math, route through <code>double</code> under <code>#ifdef __MWERKS__</code>. PPC has a hardware FPU and IEEE 754's 52-bit mantissa covers every int32 fixed-point intermediate. See <code>browser/netsurf/include/libcss/fpmath.h</code> for the reference pattern.</p>
+<p>Pure int32 multiplies and divides are fine. The miscompile is specifically the 64-bit shift-multiply path.</p>
+<h3>Carbon event class availability</h3>
+<p>Mac OS X Carbon events that were never back-ported to CarbonLib (e.g. <code>kEventMouseWheelMoved</code>) will register without error but never dispatch, and CarbonLib's dispatcher destabilizes when something downstream tries to deliver an event whose class it doesn't know. Symptoms: illegal-instruction crash at a fixed-looking address inside CarbonLib.</p>
+<p>Check Apple's <code>CarbonEvents.h</code> annotations before registering any handler. If <code>CarbonLib: not available</code>, the platform cannot deliver that event — don't install a handler, don't debug your handler, accept the platform constraint.</p>
+<h3>Live-tracking scroll bar CDEF is hardware-specific</h3>
+<p><code>kControlScrollBarLiveProc = 386</code> crashes on real G3/G4 hardware (not reproducible in SheepShaver). Use <code>kControlScrollBarProc = 384</code> (non-live) instead. Trade-off: thumb drag doesn't scroll until mouseup. fixes159 documented this.</p>
+<h3>UPP macro override on CarbonLib is unsafe</h3>
+<p>CarbonLib's <code>TrackControl</code> / <code>InstallEventHandler</code> expect MixedMode <code>RoutineDescriptor</code> UPPs, not raw PPC function pointers. The &quot;Carbon UPPs are just native function pointers&quot; shortcut only works on Mac OS X's Mach-O Carbon.framework, not CarbonLib on OS 9. Symptom: PC in very low memory (e.g. <code>0x00000008</code>) with CurApName showing <code>CodeWarrio...</code>. Either let CW8's Universal Interfaces expand the macro normally, or use the <code>TrackControl(ctrl, pt, NULL)</code> no-callback path and read state via <code>GetControlValue()</code> on return.</p>
+<hr />
+<h2>2. CW8 header and access path quirks</h2>
+<h3>Suppress Carbon.h sub-headers by pre-defining their guards</h3>
+<p>Carbon.h transitively pulls in InternetConfig.h, MacWindows.h, KeychainCore.h, ATSLayoutTypes.h, SFNTLayoutTypes.h — each of which has at least one C89 incompatibility or missing forward declaration. The clean workaround is to <code>#define __INTERNETCONFIG__</code> (or whatever Universal Interfaces guard) before <code>#include &lt;Carbon.h&gt;</code>. Carbon.h's own guard check sees the symbol defined and skips the include entirely.</p>
+<p>Per <code>macos9.h</code>:</p>
+<pre><code class="language-c">#define __INTERNETCONFIG__
+#define __KEYCHAINCORE__
+#define __ATSLayoutTypes__
+#define __ALIASES__
+struct AliasRecord;
+typedef struct AliasRecord *AliasPtr;
+typedef AliasPtr *AliasHandle;
+#include &lt;Carbon.h&gt;
+</code></pre>
+<p>The AliasHandle forward decl is needed because MacWindows.h uses <code>AliasHandle</code> in parameter types even with Aliases.h suppressed.</p>
+<h3>Shim headers must use the same include guard as the real header</h3>
+<p>If a shim header sets its own guard (e.g. <code>LIBWAPCAPLET_LIBWAPCAPLET_H</code>) but the real library header uses a different guard (e.g. <code>libwapcaplet_h_</code>), CW8's access path will find both in the same TU. The stub processes first, sets its own guard; later in the same TU the real file is found via a different path, its guard is unset, it processes too, and you get &quot;illegal name overloading&quot; on every type both files define.</p>
+<p><strong>Always make the stub's guard identical to the real header's guard.</strong> Applied in fixes264 for <code>libwapcaplet/libwapcaplet.h</code> and <code>css/utils.h</code>.</p>
+<h3>CW8 can't resolve relative includes from headers found via access paths</h3>
+<p>When a header found via an access path does <code>#include &quot;subdir/foo.h&quot;</code>, CW8 can't find foo.h because the local-directory context is lost. Simple basenames (<code>#include &quot;foo.h&quot;</code>) work if the target is in the same directory. Path prefixes (<code>#include &quot;utils/list.h&quot;</code>) fail.</p>
+<p><strong>Workarounds</strong>: make headers self-contained (inline the content), or use access paths that put the target file in the same search directory.</p>
+<h3>macsurf_prefix.h's globals</h3>
+<p>The prefix file gets injected before every TU. It must:</p>
+<ol>
+<li>Include <code>&lt;MacTypes.h&gt;</code> first (otherwise <code>bool</code>/<code>true</code>/<code>false</code> conflict with later includes)</li>
+<li>Define <code>__MACOS9__ 1</code></li>
+<li>Define <code>NO_IPV6 1</code></li>
+<li>Define <code>TARGET_API_MAC_CARBON 1</code></li>
+<li>Define <code>MACSURF_DEBUG 1</code> (gated on <code>#ifndef MACSURF_RELEASE</code>) — this is what enables the file-backed debug log; without it the entire log channel compiles to empty stubs (fixes305a regression)</li>
+<li>Stub <code>NSLOG</code> via <code>#define NSLOG(cat, level, ...) do{}while(0)</code>. CW8 supports <code>__VA_ARGS__</code> as a pre-C99 extension. <strong>Do not</strong> use a varargs C function — it forces the category token (<code>fetch</code>, <code>llcache</code>, <code>layout</code>, etc.) to be evaluated as an expression and fails with <code>'fetch' undeclared</code> in TUs where those names are not in scope.</li>
+</ol>
+<h3>Two-source dispatch.c gotcha</h3>
+<p><code>libcss/src/select/dispatch.c</code> and <code>libcss/src/select/s_dispatch.c</code> both define <code>prop_dispatch[]</code>. The Mac builds <code>s_dispatch.c</code> (basename match per commit <code>a2f5656d</code>'s flat-folder rename); the Linux side has both as a historical accident.</p>
+<ul>
+<li><strong>Only one belongs in MacSurf.mcp.</strong> Both = duplicate-symbol link error.</li>
+<li><strong>Keep both byte-identical when adding properties.</strong> Otherwise CSS_N_PROPERTIES grows but only one table grows with it → out-of-bounds dispatch → unmapped-memory exception (fixes116b crash signature <code>0x68F168F0</code>).</li>
+<li>Ship both files in the fix tar even though only one is built, so they don't silently drift.</li>
+</ul>
+<h3><code>int *</code> and <code>int32_t *</code> are incompatible on CW8 PPC</h3>
+<p>On PPC, <code>int32_t = long</code> (not <code>int</code>). CW8 is strict about pointer types: passing <code>int *</code> where <code>int32_t *</code> is expected fails with &quot;illegal implicit conversion from 'long *' to 'int *'&quot;. Common trap: autogenerated libcss parse files have <code>int32_t *ctx</code>, but a shared utility declared <code>int *ctx</code>. Make all signatures consistent.</p>
+<h3>Forward enum declarations are illegal</h3>
+<p>Any C99 header that uses <code>enum foo;</code> to forward-declare an enum will fail on CW8 with &quot;undefined identifier 'foo'&quot;. Replace with the actual <code>#include</code> of the header that provides the full enum.</p>
+<hr />
+<h2>3. Workflow: Linux → tar → scp → Mac</h2>
+<h3>Repo layout</h3>
+<pre><code>~/Webs/macsurf/                   primary working tree (Linux git)
+~/Documents/macfiles/             outbound tar staging
+   fixes149.tar, fixes150.tar...  one tar per shipped round
+   Old Zips/                      archived once a round is closed
+</code></pre>
+<h3>Per-round process</h3>
+<ol>
+<li>
+<p><strong>Edit on Linux</strong> in the macsurf working tree.</p>
+</li>
+<li>
+<p><strong>Pre-flight on Linux</strong> with Retro68 PPC GCC for C89/CW8 compatibility:</p>
+<pre><code>/home/patrick/Retro68/toolchain/bin/powerpc-apple-macos-gcc \
+  -std=c89 -pedantic-errors -Wall -Wno-long-long -Wno-pedantic \
+  -fsyntax-only -Dinline= -D__MACOS9__ -DCSS_INTERNAL \
+  -I[various include paths] \
+  path/to/changed_file.c
+</code></pre>
+<p>Pre-existing errors from the libcss/lwc shim mismatch are OK and pass on CW8 — what matters is that no NEW errors appear at the edit sites.</p>
+</li>
+<li>
+<p><strong>Bundle as a tar with the full path tree preserved</strong>:</p>
+<pre><code>tar -cf ~/Documents/macfiles/fixesNN.tar \
+  browser/libcss/src/parse/properties/p_foo.c \
+  browser/libcss/src/select/properties/s_foo.c \
+  [other changed files...]
+</code></pre>
+<p>The tar contains <em>only the files changed in this round</em> — never a full source dump (that would clobber the user's local edits to MacSurf.mcp / Access Paths). After the initial bootstrap round, every tar is delta-only.</p>
+</li>
+<li>
+<p><strong>Ship via scp</strong>:</p>
+<pre><code>scp -P 2222 -i ~/.ssh/macsurf_push \
+  ~/Documents/macfiles/fixesNN.tar \
+  patrick@localhost:Documents/macfiles/
+</code></pre>
+<p>The user's Mac is reachable via an SSH bridge on localhost port 2222.</p>
+</li>
+<li>
+<p><strong>Mention any new <code>.c</code> files for MacSurf.mcp</strong>. Do not edit the <code>.mcp</code> file from Linux — the user maintains the project file list on the Mac via the CW8 IDE, and a Linux-edited <code>.mcp</code> would clobber their local state.</p>
+</li>
+<li>
+<p><strong>Commit on Linux</strong> with a substantive commit message that captures the architectural intent. Commits are local working memory and become CLAUDE.md material when the round closes.</p>
+</li>
+<li>
+<p><strong>User unpacks on the Mac</strong>, adds any new <code>.c</code> files to MacSurf.mcp via CW8, rebuilds with &quot;Remove Object Code&quot; first, runs the binary.</p>
+</li>
+<li>
+<p><strong>User reports back</strong> via screenshots and/or the file-backed log (see §4).</p>
+</li>
+<li>
+<p><strong>Update CLAUDE.md</strong> to record what shipped (the &quot;Last shipped fix&quot; entry rolls forward, with predecessors demoted below).</p>
+</li>
+</ol>
+<h3>What goes in the tar</h3>
+<p>Source files only — never <code>.mcp</code>, never <code>Access Paths.xml</code>, never docs. The tar's footprint stays small (tens of KB up to ~300 KB for big rounds with autogenerated headers).</p>
+<h3>Numbering</h3>
+<p>The user owns the fix number. If they say a round is <code>fixes149</code>, that's what it is — don't argue with the numbering, just adopt it. Letter suffixes (<code>fixes148b</code>, <code>fixes148b3</code>) are used within a single feature's iteration when the first shipped attempt needed follow-up.</p>
+<h3>Don't blame stale files</h3>
+<p>The user's build is what they say it is. If something looks like staleness, the answer is to find a real root cause in code — a missing include, a wrong field path, an autogen mismatch — not to lecture about CW8 caches or zip-extraction failures. If you genuinely think a previously-shipped file may need to be reshipped because symptoms continued, just include it in the next zip with no narration about why. <strong>DIRECTIVE #1 in CLAUDE.md.</strong></p>
+<hr />
+<h2>4. Diagnostics: file-backed log + hardware-only verification</h2>
+<h3>The log channel</h3>
+<p><code>browser/netsurf/frontends/macos9/macsurf_debug_log.c</code> writes one CR-terminated line per <code>MS_LOG(msg)</code> or <code>macsurf_debug_log_writef(fmt, ...)</code> call to <code>MacSurf Debug.log</code> on the Desktop, flushing after every write (<code>FlushVol</code> + <code>SetFPos</code>). This is the <strong>primary post-crash backtrace channel</strong> since we can't attach MacsBug remotely.</p>
+<ul>
+<li>Located via <code>FindFolder(kOnSystemDisk, kDesktopFolderType, ...)</code>. If FindFolder fails the channel is silently inert.</li>
+<li>Format specifiers supported: <code>%d</code>, <code>%ld</code>, <code>%p</code>, <code>%s</code>, <code>%%</code> (and <code>%lx</code> is NOT supported — use <code>%ld</code> and decode hex by eye if you need it).</li>
+<li>Output capped at 255 bytes per call.</li>
+<li>Gated on <code>MACSURF_DEBUG</code> in macsurf_prefix.h. The <code>#ifdef MACSURF_DEBUG</code> test happens inside the implementation; if the define is missing, every call site compiles to nothing (fixes149/150/151 silent-instrumentation regression, then fixes305a same vector).</li>
+</ul>
+<h3>Subsystem-init audit checklist</h3>
+<p>After fixes149's three rounds of silently-failing instrumentation, we adopted this checklist:</p>
+<ol>
+<li>Init function wired in <code>main.c</code>? <code>grep -c subsystem_init main.c</code> must be &gt; 0.</li>
+<li>Init function body <strong>actually reachable</strong>? <code>#ifdef MACSURF_DEBUG</code> and similar feature-macro gates can compile the body to an empty stub. <code>grep -rn &quot;define MACSURF_DEBUG&quot;</code> must turn up at least one site.</li>
+<li>Smoke-test confirming the subsystem produces its externally-visible artefact at startup (log file appears, title bar updates, menu item present).</li>
+</ol>
+<p>Step 2 is the new one — it catches the fixes305a vector where the init call is present but the macro is missing.</p>
+<h3>Verifying via hardware probes on advanced.html</h3>
+<p>Most CSS feature work ships with <strong>probe cards</strong> added to <code>mactrove.com/advanced.html</code> (lives on the Drupal proxy, not on the Mac, so refreshing the URL is enough — no Mac-side ship). Each fix sprint adds a section with N labelled probe cards (R1-R5, C1-C5, V1-V4, G1-G6, etc.); the user refreshes on the G3 and reports green / red per card.</p>
+<p>For positioning verification, the file-backed log captures <code>plot_rect</code> and <code>plot_text</code> calls with exact (x,y) coordinates. Math against expected positions confirms whether a CSS feature is correctly applied — e.g. &quot;R1-3 at y=267, R1-1 at y=179 → diff=88px = 80 (row 0) + 8 (gap) ✓&quot;.</p>
+<h3>SheepShaver is a partial test</h3>
+<p><code>/home/patrick/Webs/MAC/sheepshaver/</code> runs OS 9.0.4 via SheepShaver on Linux, useful for:</p>
+<ul>
+<li>Smoke testing — does the build launch at all, does Carbon init succeed</li>
+<li>Rendering regression checks — does MacTrove render, does var() resolve</li>
+<li>Obvious logic bugs that escape Linux syntax check</li>
+</ul>
+<p>It is <strong>not</strong> a substitute for real hardware on:</p>
+<ul>
+<li>Hardware-specific crashes (wheel events, scroll-bar live-track, USB Overdrive interactions)</li>
+<li>Real network behavior (the prefs as shipped have no usable ethernet, so first fetch hangs ~2 min on timeout)</li>
+<li>Timing-sensitive bugs (JIT/coop-scheduler pacing differs from real PPC)</li>
+</ul>
+<p>A SheepShaver &quot;passed&quot; never closes a hardware-side gate.</p>
+<h3>MacsBug is the last resort</h3>
+<p>The G3 dev machine has MacsBug installed but the user currently lacks an ADB keyboard, which is required for many MacsBug commands. When a crash is hardware-specific and the Linux-source audit comes up empty (the documented case is the wheel crash: see CLAUDE.md &quot;Wheel crash diagnostic exhaustion&quot;), progress halts until ADB hardware is available for <code>wh</code>/<code>sc</code>/<code>ip</code>/<code>dm sp</code> capture.</p>
+<hr />
+<h2>5. Reasoning style and gotcha tracking</h2>
+<h3>CLAUDE.md is load-bearing</h3>
+<p>The &quot;Known Gotchas&quot; section is dense and growing — every non-obvious failure mode that ate more than ~30 min of debugging time gets a gotcha entry with the symptom, the root cause, and the reference fix. Examples:</p>
+<ul>
+<li>Two-source <code>dispatch.c</code> / <code>s_dispatch.c</code> requiring synchronized updates (fixes116b)</li>
+<li><code>uint8_t</code> between <code>int32_t</code> fields creating non-deterministic padding (fixes117 / fixes151b)</li>
+<li>CW8 PPC <code>long long</code> miscompile (fixes113)</li>
+<li>UPP macro override unsafe on CarbonLib (fixes147)</li>
+<li>Live-track scroll CDEF crash on real hardware (fixes159)</li>
+<li><code>kEventMouseWheelMoved</code> not in CarbonLib (fixes140)</li>
+</ul>
+<p>When you debug something hard, write the gotcha into CLAUDE.md before closing the round. The next agent reading the file at session start needs it.</p>
+<h3>Per-project memory entries</h3>
+<p>Cross-cutting lessons (workflow preferences, naming conventions, repeated gotcha categories) go in the per-project memory directory at <code>~/.claude/projects/-home-patrick-Webs-macsurf/memory/</code>. These persist across conversations and pre-load into context for future sessions. Examples in this project:</p>
+<ul>
+<li>&quot;Never blame stale files&quot; (DIRECTIVE #1 captured as a feedback memory)</li>
+<li>&quot;Fix delivery pipeline&quot; workflow note</li>
+<li>&quot;libcss properties with secondary storage need copy/compose to propagate the companion field&quot;</li>
+<li>&quot;Plotters.c port assumption&quot; — the cast-current-port-to-WindowRef pattern that broke offscreen composite</li>
+</ul>
+<h3>Be terse, don't explain to the wall</h3>
+<p>The user already knows the codebase. End-of-turn summary is one or two sentences. No hedging, no preamble, no recapping what they just told you. State diagnoses directly. If you don't know, say &quot;I don't know&quot; — don't pad.</p>
+<h3>Auto mode means ship</h3>
+<p>When the user says &quot;go&quot; or auto mode is on, pick the next item from the queue and ship it. Don't ask for confirmation on routine work. Course corrections from the user are expected and welcome.</p>
+<hr />
+<h2>6. Reference tree</h2>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>File / dir</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Project state, gotchas, ship history</td>
+<td><code>CLAUDE.md</code> (root)</td>
+</tr>
+<tr>
+<td>CSS feature inventory</td>
+<td><code>CSS_STATUS.md</code></td>
+</tr>
+<tr>
+<td>Architecture (broad)</td>
+<td><code>docs/macsurf-architecture.md</code></td>
+</tr>
+<tr>
+<td>Window-framework architecture</td>
+<td><code>docs/research/window-architecture-2026-04-22.md</code></td>
+</tr>
+<tr>
+<td>Code</td>
+<td><code>browser/netsurf/</code> (NetSurf fork) + <code>browser/libcss/</code> (with MacSurf patches)</td>
+</tr>
+<tr>
+<td>Mac frontend</td>
+<td><code>browser/netsurf/frontends/macos9/</code></td>
+</tr>
+<tr>
+<td>Debug log impl</td>
+<td><code>browser/netsurf/frontends/macos9/macsurf_debug_log.c</code></td>
+</tr>
+<tr>
+<td>Cross-pre-flight toolchain</td>
+<td><code>/home/patrick/Retro68/toolchain/bin/powerpc-apple-macos-gcc</code></td>
+</tr>
+<tr>
+<td>SheepShaver test env</td>
+<td><code>/home/patrick/Webs/MAC/sheepshaver/</code></td>
+</tr>
+<tr>
+<td>Proxy test page</td>
+<td><code>mactrove.com/advanced.html</code> (lives at <code>/home/patrick/Webs/MAC/drupal/web/advanced.html</code>)</td>
+</tr>
+<tr>
+<td>Outbound tars</td>
+<td><code>~/Documents/macfiles/</code></td>
+</tr>
+<tr>
+<td>SSH bridge to Mac</td>
+<td><code>scp -P 2222 -i ~/.ssh/macsurf_push patrick@localhost:...</code></td>
+</tr>
+<tr>
+<td>Log pull from Mac</td>
+<td><code>scp -P 2222 -i ~/.ssh/macsurf_push patrick@localhost:'Documents/macfiles/MacSurf Debug.log' /tmp/</code></td>
+</tr>
+</tbody>
+</table>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

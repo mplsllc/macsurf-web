@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Building MacSurf on the Mac — MacSurf</title>
+<meta name="description" content="How to build MacSurf from source in CodeWarrior 8 Pro on a Power Mac G3 or G4 running Mac OS 9.">
+<link rel="canonical" href="https://macsurf.org/build.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/">
+      <img src="/bannerlogo.png" alt="MacSurf">
+    </a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html" class="active">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Mac-side build</div>
+    <h1>Building MacSurf on the Mac</h1>
+    <p class="lede">Building MacSurf in CodeWarrior 8 Pro on Mac OS 9 — project settings, libraries, and the canonical compile loop.</p>
+    <p>Step-by-step guide to building MacSurf on a real Power Mac running Mac OS 9.</p>
+<hr />
+<h2>1. Installing CodeWarrior 8</h2>
+<p><strong>Requirements:</strong> Power Mac G3 or G4, Mac OS 9.1 or later, 128MB RAM recommended, CD-ROM drive.</p>
+<ol>
+<li>Insert the CodeWarrior Pro 8 CD</li>
+<li>Double-click the installer — it will walk through license acceptance and destination selection</li>
+<li>Install to the default location (<code>Macintosh HD:Metrowerks CodeWarrior:</code>)</li>
+<li>When prompted for components, ensure these are checked:
+<ul>
+<li><strong>MacOS PowerPC C/C++ Compiler</strong></li>
+<li><strong>MacOS PowerPC Linker</strong></li>
+<li><strong>MSL C Libraries</strong> (Metrowerks Standard Library)</li>
+<li><strong>Universal Headers</strong> (Mac OS Universal Interfaces)</li>
+</ul>
+</li>
+<li>Skip the Java, Windows, and Palm OS tools — they are not needed</li>
+<li>After installation completes, open CodeWarrior IDE once to confirm it launches. It will create preferences in the System Folder</li>
+<li>Verify the Universal Headers are present at:<pre><code>Metrowerks CodeWarrior:MacOS Support:Headers:Universal Headers:
+</code></pre>
+You should see folders like <code>CIncludes</code>, <code>PInterfaces</code>, etc. If missing, run the installer again and check the Universal Headers checkbox</li>
+</ol>
+<hr />
+<h2>2. Opening the Project File</h2>
+<ol>
+<li>Copy the entire <code>macsurf/browser/netsurf/</code> directory tree to the Mac (see Section 6 for transfer method)</li>
+<li>Navigate to <code>netsurf:frontends:macos9:</code> in the Finder</li>
+<li>Double-click <code>MacSurf.mcp</code> — CodeWarrior will open it and display the project window</li>
+<li>If CodeWarrior prompts &quot;Cannot find file...&quot; for any source file, the directory structure was not preserved during transfer. Verify that the <code>utils</code>, <code>content</code>, and <code>desktop</code> folders exist three levels up from the <code>macos9</code> folder</li>
+<li>The project window should show six groups in the left pane:
+<ul>
+<li>NetSurf Core Utils (10 files)</li>
+<li>NetSurf Content (7 files)</li>
+<li>NetSurf Desktop (5 files)</li>
+<li>MacSurf Frontend (11 files)</li>
+<li>POSIX Shims (5 files)</li>
+<li>Libraries (3 items)</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>3. Verifying Target Settings</h2>
+<ol>
+<li>Go to <strong>Edit &gt; MacSurf Settings...</strong> (or press Cmd-J)</li>
+<li>In the settings dialog, verify:</li>
+</ol>
+<p><strong>Target Settings panel:</strong></p>
+<ul>
+<li>Linker: MacOS PPC Linker</li>
+<li>Output Directory: <code>:</code> (current directory)</li>
+</ul>
+<p><strong>C/C++ Language panel:</strong></p>
+<ul>
+<li>Source model: C (not C++)</li>
+<li>C99 Extensions: enabled</li>
+</ul>
+<p><strong>C/C++ Preprocessor panel:</strong></p>
+<ul>
+<li>Prefix text should contain:<pre><code>#define __MACOS9__               1
+#define WITHOUT_DUKTAPE          1
+#define NO_IPV6                  1
+#define TARGET_API_MAC_CARBON    1
+</code></pre>
+</li>
+</ul>
+<p><strong>Access Paths panel:</strong></p>
+<ul>
+<li>User paths should list (in order):
+<ol>
+<li><code>{Project}/include</code></li>
+<li><code>{Project}/../../../include</code></li>
+<li><code>{Project}/../../../</code></li>
+<li><code>{Project}/shims</code></li>
+</ol>
+</li>
+<li>System paths should list:
+<ol>
+<li><code>{Compiler}/MacOS Support/Headers/Universal Headers</code></li>
+<li><code>{Compiler}/MacOS Support/Libraries/Runtime/Shared Support</code></li>
+</ol>
+</li>
+</ul>
+<p><strong>PPC Processor panel:</strong></p>
+<ul>
+<li>Processor: 750 (G3) — works on G3 and G4</li>
+<li>Struct Alignment: PowerPC</li>
+</ul>
+<ol start="3">
+<li>Click OK to save</li>
+</ol>
+<hr />
+<h2>4. First Build Attempt</h2>
+<p>Press Cmd-M (Project &gt; Make) to start the build. Here is what to expect:</p>
+<h3>What will succeed</h3>
+<p>The POSIX shim files and frontend files should compile without errors — these have been syntax-checked on Linux with equivalent flags. Files that compiled clean in our Linux syntax-check rounds:</p>
+<ul>
+<li>All 5 <code>utils/</code> files (Round 2 — zero errors, zero warnings)</li>
+<li>All 3 <code>content/</code> files (Round 2 — zero errors)</li>
+<li>All 5 <code>desktop/</code> files (Round 3 — zero errors)</li>
+<li>All 11 frontend files (Round 4 — zero errors)</li>
+</ul>
+<h3>What will likely fail</h3>
+<p><strong>Missing library headers.</strong> The project references headers from NetSurf dependency libraries (libwapcaplet, libcss, libdom, libparserutils, libhubbub). During Linux syntax checking, we copied these headers into <code>netsurf/include/</code>. Verify they are present on the Mac at:</p>
+<pre><code>netsurf:include:libwapcaplet:
+netsurf:include:libcss:
+netsurf:include:dom:
+netsurf:include:parserutils:
+netsurf:include:hubbub:
+netsurf:include:nsutils:
+netsurf:include:curl:
+</code></pre>
+<p>If any are missing, copy them from the corresponding <code>browser/lib*/include/</code> directories.</p>
+<p><strong>CarbonLib linking.</strong> If the linker reports &quot;CarbonLib not found&quot;, you need to add it manually:</p>
+<ol>
+<li>Go to Project &gt; Add Files...</li>
+<li>Navigate to <code>System Folder:Extensions:</code></li>
+<li>Select <code>CarbonLib</code></li>
+<li>Add it to the Libraries group</li>
+</ol>
+<p><strong>MSL library path issues.</strong> CodeWarrior 8 ships MSL libraries in slightly different directory structures depending on the installer version. If &quot;MSL C.Carbon.Lib&quot; is not found:</p>
+<ol>
+<li>Use Sherlock (Cmd-F in Finder) to search for &quot;MSL C.Carbon.Lib&quot; on the boot volume</li>
+<li>Note the actual path</li>
+<li>In the project, remove the broken library reference and re-add from the correct location</li>
+</ol>
+<h3>Expected error count</h3>
+<p>On a clean first build with all headers in place: <strong>zero compile errors for the 24 source files listed in the project.</strong> The first real errors will come at link time — unresolved symbols from library code (libcss, libdom, etc.) that is not yet compiled as part of the project. This is expected. The next step is to add the dependency library source files to the project or build them as separate library projects.</p>
+<hr />
+<h2>5. Reading CodeWarrior Error Output</h2>
+<h3>The Errors &amp; Warnings window</h3>
+<p>After a build, CodeWarrior shows an <strong>Errors &amp; Warnings</strong> window. Each entry shows:</p>
+<pre><code>File &quot;utils.c&quot;, line 477: warning: implicit declaration of 'strdup'
+</code></pre>
+<ul>
+<li><strong>Double-click</strong> any error to jump to the exact line in the source editor</li>
+<li>Errors are red (stop icon) — the file did not compile</li>
+<li>Warnings are yellow (caution icon) — compiled but suspicious</li>
+</ul>
+<h3>Common error patterns and what they mean</h3>
+<table>
+<thead>
+<tr>
+<th>Error Message</th>
+<th>Likely Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>file not found: &quot;libwapcaplet/libwapcaplet.h&quot;</code></td>
+<td>Missing dependency library headers</td>
+<td>Copy headers into <code>netsurf/include/</code> (see Section 4)</td>
+</tr>
+<tr>
+<td><code>undefined identifier 'PATH_MAX'</code></td>
+<td><code>config.h</code> <code>__MACOS9__</code> block not active</td>
+<td>Verify <code>__MACOS9__</code> is in the preprocessor prefix text (Section 3)</td>
+</tr>
+<tr>
+<td><code>implicit declaration of 'strdup'</code></td>
+<td>POSIX function not declared</td>
+<td>Should be in <code>utils/config.h</code> under <code>__MACOS9__</code> guard — check that the config.h edits from <code>core-compile-attempt.md</code> Round 2 are present</td>
+</tr>
+<tr>
+<td><code>undefined identifier 'WindowRef'</code></td>
+<td>Mac Toolbox header not included</td>
+<td>Ensure <code>#ifdef __MACOS9__</code> path includes <code>&lt;MacWindows.h&gt;</code> in the affected file</td>
+</tr>
+<tr>
+<td><code>cannot convert 'void' to 'int'</code></td>
+<td><code>ns_close_socket</code> macro issue</td>
+<td>Verify <code>utils/inet.h</code> has <code>((void)(s), 0)</code> not <code>((void)(s))</code> for the <code>__MACOS9__</code> case (fix from Round 3)</td>
+</tr>
+<tr>
+<td><code>link failed: unresolved 'lwc_intern_string'</code></td>
+<td>libwapcaplet object code not in project</td>
+<td>Build libwapcaplet source or add its .c files to the project</td>
+</tr>
+<tr>
+<td><code>link failed: unresolved 'css_stylesheet_create'</code></td>
+<td>libcss object code not in project</td>
+<td>Build libcss source or add its .c files to the project</td>
+</tr>
+</tbody>
+</table>
+<h3>Mapping errors to the task list</h3>
+<p>The project is structured in compilation layers matching the research docs:</p>
+<ol>
+<li><strong>POSIX Shims</strong> — if these fail, fix the shim code first. Refer to <code>posix-portability.md</code> Section 2 for the implementation plan for each shim</li>
+<li><strong>NetSurf Core Utils</strong> — errors here usually mean a <code>config.h</code> macro is wrong or a shim header is missing. Refer to <code>core-compile-attempt.md</code> for the exact fixes applied in each round</li>
+<li><strong>NetSurf Content</strong> — depends on Utils compiling clean. Content-layer errors are usually missing library headers (libwapcaplet, libcss, libdom)</li>
+<li><strong>NetSurf Desktop</strong> — depends on Content and Utils. Desktop errors are usually missing library headers or POSIX function declarations</li>
+<li><strong>MacSurf Frontend</strong> — depends on all of the above. Frontend errors are usually missing Toolbox headers or Mac-specific API issues</li>
+</ol>
+<p>Work bottom-up: fix shim errors first, then utils, then content, then desktop, then frontend.</p>
+<hr />
+<h2>6. Transferring Source Files from Linux to Mac</h2>
+<h3>FAT32 thumb drive method</h3>
+<p>This is the simplest and most reliable transfer method. Mac OS 9 reads FAT32 (called &quot;DOS&quot; in Mac OS 9) volumes natively via File Exchange.</p>
+<p><strong>On Linux:</strong></p>
+<ol>
+<li>
+<p>Format a USB thumb drive as FAT32 (most are already FAT32):</p>
+<pre><code># Only if reformatting is needed — this erases the drive
+sudo mkfs.vfat -F 32 /dev/sdX1
+</code></pre>
+</li>
+<li>
+<p>Mount the drive and copy the source tree:</p>
+<pre><code>mount /dev/sdX1 /mnt/usb
+cp -r browser/netsurf/ /mnt/usb/netsurf/
+sync
+umount /mnt/usb
+</code></pre>
+</li>
+<li>
+<p><strong>Line endings:</strong> Mac OS 9 expects CR (<code>\r</code>) line endings, not LF (<code>\n</code>). CodeWarrior 8 handles both, so this is usually not an issue for compilation. But if you edit files in SimpleText or BBEdit Lite on the Mac side, convert first:</p>
+<pre><code>find /mnt/usb/netsurf -name &quot;*.c&quot; -o -name &quot;*.h&quot; | xargs sed -i 's/$/\r/'
+</code></pre>
+</li>
+<li>
+<p><strong>Filename length:</strong> FAT32 supports long filenames (up to 255 chars). All MacSurf filenames are well within this limit. No issues expected.</p>
+</li>
+</ol>
+<p><strong>On the Mac:</strong></p>
+<ol>
+<li>Insert the thumb drive. It should appear on the desktop as a DOS volume (generic disk icon)</li>
+<li>If it does not mount, open <strong>Control Panels &gt; File Exchange</strong> and ensure &quot;Mount DOS disks&quot; is checked</li>
+<li>Open the drive and drag the <code>netsurf</code> folder to your hard drive — placing it wherever you want the project to live</li>
+<li>The Finder will copy all files, preserving the directory structure. FAT32 does not preserve Mac resource forks, but all MacSurf source files are plain text data-fork files, so nothing is lost</li>
+</ol>
+<h3>After transfer — verify structure</h3>
+<p>Open the <code>netsurf</code> folder on the Mac and confirm this structure exists:</p>
+<pre><code>netsurf:
+  frontends:
+    macos9:
+      MacSurf.mcp        ← the project file
+      main.c
+      window.c
+      ...
+      shims:
+        mac_iconv.c
+        mac_file_io.c
+        ...
+  utils:
+    utils.c
+    config.h
+    ...
+  content:
+    llcache.c
+    fetch.c
+    ...
+  desktop:
+    browser.c
+    ...
+  include:
+    libwapcaplet:
+    libcss:
+    dom:
+    ...
+</code></pre>
+<p>The <code>MacSurf.mcp</code> project file uses relative paths (<code>../../../utils/utils.c</code> etc.), so the directory hierarchy must be intact. If you placed files in a different structure, update the access paths in the project settings (Section 3).</p>
+<h3>Alternative: AppleTalk/FTP</h3>
+<p>If both machines are on the same network, Mac OS 9's built-in FTP Access (in the Internet control panel) or a third-party FTP client like Fetch can transfer files directly. But the thumb drive method avoids network configuration entirely and works with any Mac that has a USB port (all G3s and G4s do).</p>
+
+  </article>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+</body>
+</html>
