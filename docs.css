@@ -10,14 +10,14 @@ a:hover{color:var(--orange);}
 /* ---------- doc shell ---------- */
 .doc{
   background:var(--white);
-  border:1.5px solid var(--line);
+  border:1px solid var(--hair);
   border-radius:14px;
   box-shadow:0 12px 30px var(--shadow);
   padding:48px 56px;
   margin:36px auto 60px;
 }
 .eyebrow{
-  font-family:'Silkscreen',monospace;font-size:10px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
   color:var(--rust);letter-spacing:.08em;text-transform:uppercase;
   margin-bottom:14px;
 }
@@ -32,7 +32,7 @@ a:hover{color:var(--orange);}
   font-family:'Bricolage Grotesque',Georgia,serif;
   font-weight:700;font-size:24px;color:var(--ink);
   margin:36px 0 12px;padding-bottom:6px;
-  border-bottom:1.5px solid var(--platinum-d);
+  border-bottom:1px solid var(--platinum-d);
 }
 .doc h3{
   font-family:'Bricolage Grotesque',Georgia,serif;
@@ -74,7 +74,7 @@ a:hover{color:var(--orange);}
   font-size:13px;
   line-height:1.55;
   margin:16px 0;
-  box-shadow:0 0 0 1.5px var(--line),0 4px 12px var(--shadow);
+  box-shadow:0 0 0 1px var(--hair),0 4px 12px var(--shadow);
 }
 .doc pre code{
   background:transparent;border:none;padding:0;color:inherit;font-size:inherit;
@@ -84,7 +84,7 @@ a:hover{color:var(--orange);}
 .doc table{
   border-collapse:collapse;width:100%;
   background:var(--white);
-  border:1.5px solid var(--line);
+  border:1px solid var(--hair);
   border-radius:6px;
   overflow:hidden;
 }
@@ -97,7 +97,7 @@ a:hover{color:var(--orange);}
 }
 .doc th{
   background:var(--paper-2);
-  font-family:'Silkscreen',monospace;
+  font-family:'IBM Plex Mono',monospace;
   font-size:10px;
   letter-spacing:.04em;
   text-transform:uppercase;
@@ -107,7 +107,7 @@ a:hover{color:var(--orange);}
 
 /* footer */
 footer.foot{
-  border-top:1.5px solid var(--line);
+  border-top:1px solid var(--hair);
   background:var(--white);
   padding:24px 0;
   font-size:13px;

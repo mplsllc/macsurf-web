@@ -14,20 +14,20 @@
 <script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
 <style>
   .issues-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:6px 0 24px;}
-  .issues-count{font-family:'Silkscreen',monospace;font-size:10px;color:var(--ink-2);}
+  .issues-count{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-2);}
   .issues-count b{color:var(--rust);}
   .issue{
     display:block;text-decoration:none;color:inherit;
-    background:var(--white);border:1.5px solid var(--line);border-radius:10px;
+    background:var(--white);border:1px solid var(--hair);border-radius:10px;
     padding:18px 20px;margin:0 0 14px;
-    box-shadow:0 6px 0 -3px var(--shadow);
+    box-shadow:0 10px 24px -12px var(--shadow);
     transition:transform .12s, box-shadow .12s;
   }
-  .issue:hover{transform:translateY(-2px);box-shadow:0 9px 0 -3px var(--shadow);}
+  .issue:hover{transform:translateY(-2px);box-shadow:0 14px 30px -12px var(--shadow);}
   .issue-top{display:flex;gap:12px;align-items:baseline;}
   .issue-num{
     font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
-    color:var(--white);background:var(--ink-2);border:1.5px solid var(--line);
+    color:var(--white);background:var(--ink-2);border:1px solid var(--hair);
     border-radius:5px;padding:2px 7px;flex:none;
   }
   .issue-title{font-family:'Bricolage Grotesque',Georgia,serif;font-weight:700;font-size:18px;color:var(--ink);line-height:1.25;}
@@ -44,7 +44,7 @@
   .issues-state{padding:30px 4px;color:var(--ink-2);font-size:15px;}
   .issues-state.err{color:var(--rust);}
   .skeleton{
-    background:var(--white);border:1.5px solid var(--platinum-d);border-radius:10px;
+    background:var(--white);border:1px solid var(--platinum-d);border-radius:10px;
     height:84px;margin:0 0 14px;opacity:.55;
     background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);
     background-size:200% 100%;animation:sk 1.3s linear infinite;
@@ -83,7 +83,7 @@
 
     <div class="issues-bar">
       <span class="issues-count" id="issues-count">Loading…</span>
-      <a class="btn-ghost" style="font-family:'Silkscreen',monospace;font-size:10px;text-decoration:none;color:var(--ink);background:linear-gradient(var(--white),#e7e3d6);border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 3px 8px var(--shadow);" href="https://github.com/mplsllc/macsurf/issues/new/choose" rel="noopener">Open an issue ↗</a>
+      <a class="btn-ghost" style="font-family:'IBM Plex Mono',monospace;font-size:10px;text-decoration:none;color:var(--ink);background:linear-gradient(var(--white),#e7e3d6);border:1px solid var(--hair);border-radius:8px;padding:8px 12px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 3px 8px var(--shadow);" href="https://github.com/mplsllc/macsurf/issues/new/choose" rel="noopener">Open an issue ↗</a>
     </div>
 
     <div id="issues-list">
