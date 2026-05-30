@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issues &amp; roadmap — MacSurf</title>
+<meta name="description" content="Open issues and feature requests for MacSurf, pulled live from GitHub.">
+<link rel="canonical" href="https://macsurf.org/issues.html">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/core.css">
+<link rel="stylesheet" href="/docs.css">
+<script defer src="https://stats.mp.ls/script.js" data-website-id="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></script>
+<style>
+  .issues-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin:6px 0 24px;}
+  .issues-count{font-family:'Silkscreen',monospace;font-size:10px;color:var(--ink-2);}
+  .issues-count b{color:var(--rust);}
+  .issue{
+    display:block;text-decoration:none;color:inherit;
+    background:var(--white);border:1.5px solid var(--line);border-radius:10px;
+    padding:18px 20px;margin:0 0 14px;
+    box-shadow:0 6px 0 -3px var(--shadow);
+    transition:transform .12s, box-shadow .12s;
+  }
+  .issue:hover{transform:translateY(-2px);box-shadow:0 9px 0 -3px var(--shadow);}
+  .issue-top{display:flex;gap:12px;align-items:baseline;}
+  .issue-num{
+    font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;
+    color:var(--white);background:var(--ink-2);border:1.5px solid var(--line);
+    border-radius:5px;padding:2px 7px;flex:none;
+  }
+  .issue-title{font-family:'Bricolage Grotesque',Georgia,serif;font-weight:700;font-size:18px;color:var(--ink);line-height:1.25;}
+  .issue-labels{display:flex;flex-wrap:wrap;gap:6px;margin-top:11px;}
+  .issue-label{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:500;
+    padding:2px 8px;border-radius:20px;border:1px solid rgba(0,0,0,.18);
+  }
+  .issue-meta{
+    display:flex;flex-wrap:wrap;gap:14px;margin-top:12px;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink-2);
+  }
+  .issue-meta .gh{color:var(--rust);}
+  .issues-state{padding:30px 4px;color:var(--ink-2);font-size:15px;}
+  .issues-state.err{color:var(--rust);}
+  .skeleton{
+    background:var(--white);border:1.5px solid var(--platinum-d);border-radius:10px;
+    height:84px;margin:0 0 14px;opacity:.55;
+    background-image:linear-gradient(90deg,transparent,rgba(255,255,255,.7),transparent);
+    background-size:200% 100%;animation:sk 1.3s linear infinite;
+  }
+  @keyframes sk{to{background-position:-200% 0;}}
+  @media(prefers-reduced-motion:reduce){.skeleton{animation:none;}}
+</style>
+</head>
+<body>
+
+<header class="menubar">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/bannerlogo.png" alt="MacSurf"></a>
+    <nav class="menu-links">
+      <a href="/">Overview</a>
+      <a href="/architecture.html">Architecture</a>
+      <a href="/build.html">Build</a>
+      <a href="/cross-dev.html">Cross-dev</a>
+      <a href="/proxy.html">Proxy</a>
+      <a href="/css.html">CSS status</a>
+      <a href="/story.html">Story</a>
+      <a href="/history.html">History</a>
+      <a href="/license.html">License</a>
+      <a href="/issues.html" class="active">Issues</a>
+      <a href="https://github.com/mplsllc/macsurf">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <article class="doc">
+    <div class="eyebrow">Community</div>
+    <h1>Issues &amp; roadmap</h1>
+    <p class="lede">Open issues, bugs, and feature requests for MacSurf — pulled live from
+    <a href="https://github.com/mplsllc/macsurf/issues">GitHub</a> each time this page loads.</p>
+
+    <div class="issues-bar">
+      <span class="issues-count" id="issues-count">Loading…</span>
+      <a class="btn-ghost" style="font-family:'Silkscreen',monospace;font-size:10px;text-decoration:none;color:var(--ink);background:linear-gradient(var(--white),#e7e3d6);border:1.5px solid var(--line);border-radius:8px;padding:8px 12px;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 3px 8px var(--shadow);" href="https://github.com/mplsllc/macsurf/issues/new/choose" rel="noopener">Open an issue ↗</a>
+    </div>
+
+    <div id="issues-list">
+      <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+    </div>
+  </article>
+</main>
+
+<section class="discuss">
+  <div class="discuss-card">
+    <h2>Discussion</h2>
+    <p class="note">Powered by <a href="https://github.com/mplsllc/macsurf/discussions" rel="noopener">GitHub Discussions</a> — sign in with GitHub to comment.</p>
+    <script src="https://giscus.app/client.js"
+      data-repo="mplsllc/macsurf"
+      data-repo-id="R_kgDOR8m90A"
+      data-category="Announcements"
+      data-category-id="DIC_kwDOR8m90M4C9es5"
+      data-mapping="pathname"
+      data-strict="0"
+      data-reactions-enabled="1"
+      data-emit-metadata="0"
+      data-input-position="bottom"
+      data-theme="light"
+      data-lang="en"
+      crossorigin="anonymous"
+      async>
+    </script>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>MacSurf — a web browser for Classic Mac OS 9 PowerPC. Derivative work of <a href="https://www.netsurf-browser.org/">NetSurf</a>.</span>
+    <a class="mpls-mark" href="https://mp.ls/" rel="noopener">
+      <img src="/img/mpls-lightlogo.png" alt="MPLS LLC" style="height:20px;width:auto;">
+      <span>An <strong>MPLS LLC</strong> project</span>
+    </a>
+    <a class="mpls-mark" href="https://mactrove.com/" rel="noopener">
+      <img src="/img/mactrove-logo.png" alt="MacTrove" style="height:20px;width:auto;">
+      <span>Companion to <strong>MacTrove</strong></span>
+    </a>
+    <span><a href="/license.html">GPLv2 + OpenSSL exception</a> · <a href="https://github.com/mplsllc/macsurf">source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var REPO = 'mplsllc/macsurf';
+  var listEl = document.getElementById('issues-list');
+  var countEl = document.getElementById('issues-count');
+
+  function esc(s){ return (s||'').replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  // pick black/white text for a given hex bg for readable label chips
+  function textOn(hex){
+    if(!hex) return '#16223c';
+    var r=parseInt(hex.substr(0,2),16), g=parseInt(hex.substr(2,2),16), b=parseInt(hex.substr(4,2),16);
+    var lum=(0.299*r+0.587*g+0.114*b)/255;
+    return lum>0.6 ? '#16223c' : '#ffffff';
+  }
+
+  function ago(iso){
+    var d=new Date(iso), now=new Date(), s=Math.floor((now-d)/1000);
+    var u=[['year',31536000],['month',2592000],['week',604800],['day',86400],['hour',3600],['minute',60]];
+    for(var i=0;i<u.length;i++){ var n=Math.floor(s/u[i][1]); if(n>=1) return n+' '+u[i][0]+(n>1?'s':'')+' ago'; }
+    return 'just now';
+  }
+
+  function render(issues){
+    if(!issues.length){
+      countEl.innerHTML = 'No open issues';
+      listEl.innerHTML = '<div class="issues-state">🎉 No open issues right now. If you hit a bug, '+
+        '<a href="https://github.com/'+REPO+'/issues/new/choose">open one on GitHub</a>.</div>';
+      return;
+    }
+    countEl.innerHTML = '<b>'+issues.length+'</b> open issue'+(issues.length>1?'s':'');
+    listEl.innerHTML = issues.map(function(it){
+      var labels = (it.labels||[]).map(function(l){
+        var c = (l.color||'cccccc');
+        return '<span class="issue-label" style="background:#'+c+';color:'+textOn(c)+'">'+esc(l.name)+'</span>';
+      }).join('');
+      return '<a class="issue" href="'+esc(it.html_url)+'" rel="noopener">'+
+        '<div class="issue-top"><span class="issue-num">#'+it.number+'</span>'+
+        '<span class="issue-title">'+esc(it.title)+'</span></div>'+
+        (labels ? '<div class="issue-labels">'+labels+'</div>' : '')+
+        '<div class="issue-meta">'+
+          '<span>opened '+ago(it.created_at)+' by '+esc(it.user&&it.user.login)+'</span>'+
+          '<span>💬 '+(it.comments||0)+'</span>'+
+          '<span class="gh">View on GitHub ↗</span>'+
+        '</div></a>';
+    }).join('');
+  }
+
+  function fail(msg){
+    countEl.textContent = '';
+    listEl.innerHTML = '<div class="issues-state err">Couldn’t load issues from GitHub'+
+      (msg?(' ('+esc(msg)+')'):'')+'. View them directly at '+
+      '<a href="https://github.com/'+REPO+'/issues">github.com/'+REPO+'/issues</a>.</div>';
+  }
+
+  fetch('https://api.github.com/repos/'+REPO+'/issues?state=open&per_page=100&sort=created&direction=desc',
+        {headers:{'Accept':'application/vnd.github+json'}})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(items){ render(items.filter(function(i){ return !i.pull_request; })); })
+    .catch(function(e){ fail(e.message); });
+})();
+</script>
+
+</body>
+</html>
