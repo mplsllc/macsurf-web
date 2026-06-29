@@ -77,7 +77,7 @@
 <ul>
 <li>Use plain <code>OTOpenEndpoint</code> / <code>InitOpenTransport</code>, <strong>not</strong> the <code>*InContext</code> variants. Every CarbonLib crash we've debugged has traced to InContext routing through OTClientLib in an uninitialized state.</li>
 <li><code>OTUseSyncIdleEvents(ep, true)</code> plus a notifier that calls <code>YieldToAnyThread()</code> on <code>kOTSyncIdleEvent</code> — this is how synchronous OT calls cooperate with the rest of the app.</li>
-<li>Carbon CFM cannot do passive (listening) OT binds. The OS rejects it categorically; we verified across 14 rounds in macSSL before pivoting. Don't try to write a local server.</li>
+<li>Carbon CFM cannot do passive (listening) OT binds. The OS rejects it categorically; we verified across 14 rounds in macTLS before pivoting. Don't try to write a local server.</li>
 </ul>
 <h3>No preemptive threads</h3>
 <p>OS 9 is cooperative multitasking. Run a <code>WaitNextEvent</code> UI loop. Long-running work yields via <code>YieldToAnyThread()</code> or by returning to WNE.</p>
