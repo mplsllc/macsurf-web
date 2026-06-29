@@ -1,8 +1,8 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
 <HTML>
 <HEAD>
-<TITLE>MacSurf -- the modern web, on a 25-year-old Mac</TITLE>
-<META NAME="description" CONTENT="MacSurf is a real web browser for Classic Mac OS 9 PowerPC.">
+<TITLE>MacSurf -- an OS 9 browser that loads the modern web</TITLE>
+<META NAME="description" CONTENT="MacSurf is a native web browser for Classic Mac OS 9 PowerPC that loads modern sites.">
 <SCRIPT TYPE="text/javascript" SRC="https://stats.mp.ls/script.js" DEFER DATA-WEBSITE-ID="c9c06f2a-1e9e-4404-9698-0f9e87c50911"></SCRIPT>
 </HEAD>
 <BODY BGCOLOR="#e9e5d8" TEXT="#16223c" LINK="#c6371d" VLINK="#8a2410" ALINK="#e8771b">
@@ -13,11 +13,11 @@
 
 <P><IMG SRC="bannerlogo.png" ALT="MacSurf" WIDTH="320"></P>
 
-<H1>The modern web, on a 25-year-old Mac.</H1>
+<H1>An OS 9 browser that loads the modern web.</H1>
 
-<P><B>MacSurf is a real web browser for Classic Mac OS 9.</B>
-Real CSS3. Real ES5 JavaScript. Real PNGs with alpha. Rendering live
-inside the 64 MB memory floor of a beige G3.</P>
+<P><B>MacSurf is a native web browser for Classic Mac OS 9.</B>
+It renders real CSS3 and ES5 JavaScript and speaks native TLS 1.3,
+so a 25-year-old PowerPC Mac can load modern sites again.</P>
 
 <P><FONT SIZE="2"><I>You are viewing the plain HTTP edition, served without
 modern CSS or scripting so that Netscape 3, Internet Explorer 5, MacWeb,
@@ -26,107 +26,15 @@ iCab 2, and other vintage browsers can read it. The full site is at
 
 <HR>
 
-<H2>The web outgrew Classic Mac OS twenty years ago.</H2>
+<H2>Get it</H2>
 
-<P>Every browser project for OS 9 quietly stopped: Internet Explorer in 2003,
-iCab not long after, Classilla in 2014. Modern sites became unreachable from
-the machine they were designed on. MacSurf is the answer -- a NetSurf port
-built from scratch in CodeWarrior against the Carbon API, with a real
-rendering pipeline and a tiny Go proxy for TLS.</P>
+<P>The current release is <B>MacSurf 1.4 &ldquo;Open House&rdquo;</B>.
+Downloads and release notes are on the
+<A HREF="https://github.com/mplsllc/macsurf/releases">GitHub releases page</A>.</P>
 
-<H2>Three pieces. One working browser.</H2>
-
-<P><B>1. MacSurf (the browser).</B>
-A native Carbon application written in C with CodeWarrior 8 Pro. Fork of
-NetSurf, with QuickDraw plotters, GWorld back-buffer, libcss, Duktape ES5
-JavaScript, and lodepng for real alpha-blended PNG.</P>
-
-<P><B>2. macTLS (the proxy).</B>
-A single self-contained Go binary that fronts HTTPS for the browser. No
-config files, no dependencies. Point the browser at the host and you are
-on the modern web.</P>
-
-<P><B>3. The cross-dev workflow.</B>
-Source stays cross-compile-clean against Retro68 PowerPC GCC, so syntax
-checks and clean builds happen on Linux. CodeWarrior on the Mac produces
-the shipping PEF binary.</P>
-
-<H2>A full rendering engine, not a demo.</H2>
-
-<H3>Rendering pipeline</H3>
-<UL>
-<LI>Full NetSurf fetch, parse, cascade, layout, plot
-<LI>Native libcss with var() resolution
-<LI>QuickDraw plotters with an offscreen GWorld back-buffer
-<LI>CSS 2.1 painting order and z-index stacking contexts
-</UL>
-
-<H3>CSS -- 150+ properties</H3>
-<UL>
-<LI>Custom properties and var()
-<LI>Flexbox -- justify-content, order, align
-<LI>Grid V1 -- grid-template, gap
-<LI>Gradients, border-radius, box-shadow, opacity
-<LI>transform, text-shadow, counters, aspect-ratio
-</UL>
-
-<H3>JavaScript -- Duktape ES5</H3>
-<UL>
-<LI>Closures, prototypes, regex, JSON
-<LI>Promises via polyfill, deep recursion
-<LI>Live Mandelbrot computed in-page
-<LI>About 6 seconds for ackermann(3,7) on a 233 MHz G3
-</UL>
-
-<H3>Images -- all five formats</H3>
-<UL>
-<LI>PNG with real per-pixel alpha (lodepng + CopyMask)
-<LI>GIF with palette transparency
-<LI>JPEG, BMP and TIFF decoding
-<LI>QuickTime Graphics Importers as the content handler
-</UL>
-
-<H3>Networking</H3>
-<UL>
-<LI>Open Transport TCP, plain non-InContext calls
-<LI>HTTP/1.1 with chunked, keep-alive, and 3xx follow
-<LI>Connection pooling, 15 second no-progress timeout
-<LI>HTTPS via the Go proxy or native macTLS
-</UL>
-
-<H3>Browser chrome</H3>
-<UL>
-<LI>Address bar, back, forward, reload, home
-<LI>Status bar, page-info, multi-window
-<LI>Smooth scroll bar and keyboard scrolling
-<LI>Platinum-themed native Carbon UI
-</UL>
-
-<HR>
-
-<H2>Two ways in.</H2>
-
-<P><B>Build the browser on the Mac with CodeWarrior:</B></P>
-<PRE>
-  open MacSurf.mcp
-  make --target PowerPC
-</PRE>
-
-<P><B>Run the proxy with one Go binary:</B></P>
-<PRE>
-  cd proxy
-  go build -o macsurf-proxy
-  ./macsurf-proxy
-  -&gt; listening on :8080
-</PRE>
-
-<HR>
-
-<H2>Download</H2>
-
-<P>Two StuffIt archives. Right-click (or hold the mouse down) and choose
-<I>Save Target As&hellip;</I> / <I>Save Link As&hellip;</I> to download. Decompress
-with <B>StuffIt Expander</B> on the Mac.</P>
+<P>You can also grab the StuffIt archives directly. Right-click (or hold the mouse
+down) and choose <I>Save Target As&hellip;</I> / <I>Save Link As&hellip;</I> to download,
+then decompress with <B>StuffIt Expander</B> on the Mac.</P>
 
 <UL>
 <LI><A HREF="/builds/MacSurf.sit"><B>MacSurf.sit</B></A>
@@ -147,7 +55,7 @@ save option in modern browsers.</FONT></P>
 
 <UL>
 <LI><A HREF="https://github.com/mplsllc/macsurf">github.com/mplsllc/macsurf</A> -- the browser
-<LI><A HREF="https://github.com/mplsllc/macTLS">github.com/mplsllc/macTLS</A> -- the TLS proxy
+<LI><A HREF="https://github.com/mplsllc/macTLS">github.com/mplsllc/macTLS</A> -- native TLS 1.3 library for OS 9
 </UL>
 
 <HR>
