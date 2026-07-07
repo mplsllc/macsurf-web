@@ -16,8 +16,8 @@
 <H1>An OS 9 browser that loads the modern web.</H1>
 
 <P><B>MacSurf is a native web browser for Classic Mac OS 9.</B>
-It renders real CSS3 and ES5 JavaScript and speaks native TLS 1.3,
-so a 25-year-old PowerPC Mac can load modern sites again.</P>
+It renders real CSS3 and modern JavaScript (ES2023, via the macQJS engine) and speaks
+native TLS 1.3, so a 25-year-old PowerPC Mac can load modern sites again.</P>
 
 <P><FONT SIZE="2"><I>You are viewing the plain HTTP edition, served without
 modern CSS or scripting so that Netscape 3, Internet Explorer 5, MacWeb,
@@ -28,12 +28,20 @@ iCab 2, and other vintage browsers can read it. The full site is at
 
 <H2>Get it</H2>
 
-<P>The current release is <B>MacSurf 1.4 &ldquo;Open House&rdquo;</B>.
-Download the ready-to-run binary directly:</P>
+<P>The current release is <B>MacSurf 1.68 &ldquo;macQJS&rdquo;</B> &mdash; named for
+<A HREF="https://68kmla.org/">68kmla.org</A>, the community this release cycle was built
+against. The headline change: the old ES5 JavaScript engine (Duktape) has been replaced
+with <B>macQJS</B>, a QuickJS port for Classic Mac OS, so real modern site scripts
+(ES2023 &mdash; <TT>let</TT>/<TT>const</TT>, arrow functions, classes, async/await) now
+run as written instead of through a lossy transpiler. Typing now shows a real text
+cursor and lets you select text, logins persist across page loads, and startup no
+longer has the old ~17-second freeze.</P>
+
+<P>Download the ready-to-run binary directly:</P>
 
 <UL>
-<LI><A HREF="/builds/MacSurf.sit"><B>MacSurf.sit</B></A>
-    -- ready-to-run binary, 851&nbsp;KB.
+<LI><A HREF="/builds/MacSurf168.sit"><B>MacSurf168.sit</B></A>
+    -- ready-to-run binary, 1.1&nbsp;MB.
     Expand on Mac&nbsp;OS&nbsp;9.1 or newer with CarbonLib&nbsp;1.5+ and double-click to launch.
 </UL>
 
@@ -44,6 +52,10 @@ Download the ready-to-run binary directly:</P>
 <P><FONT SIZE="2">If your browser opens the file as text instead of downloading,
 hold the Option key while clicking the link (Classic Mac), or use the right-click
 save option in modern browsers.</FONT></P>
+
+<P><FONT SIZE="2"><I>GitHub and some other heavy HTTPS sites don't render on-device
+yet, so this plain HTTP page is the recommended way to fetch new MacSurf builds
+directly on real Mac OS 9 hardware &mdash; no VM or second machine required.</I></FONT></P>
 
 <HR>
 
