@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MacSurf line-breaker cluster (overflow-wrap / word-break / hyphens / justify)</title>
+<style>
+  body { font: 15px/1.35 Geneva, Verdana, sans-serif; margin: 12px; color: #111; background: #fff; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 18px 0 6px; border-bottom: 2px solid #333; padding-bottom: 2px; }
+  .lead { font-size: 12px; color: #444; margin: 0 0 10px; }
+  .legend span { display: inline-block; padding: 1px 6px; margin-right: 6px; font-size: 11px; border-radius: 3px; }
+  .k-ok  { background: #e2f6e2; border: 1px solid #4a4; }
+  .k-bad { background: #fde3e3; border: 1px solid #c33; }
+  .blk { margin: 0 0 14px; }
+  .lbl { font-size: 11px; font-weight: bold; margin: 0 0 3px; }
+  .lbl .tag { display: inline-block; font-size: 10px; padding: 0 5px; margin-right: 5px;
+              border-radius: 3px; vertical-align: 1px; }
+  .lbl .ok  { background: #e2f6e2; border: 1px solid #4a4; color: #163; }
+  .lbl .bad { background: #fde3e3; border: 1px solid #c33; color: #911; }
+  .exp { font-size: 10px; color: #555; font-weight: normal; }
+  /* Narrow force-break columns: the 1px border is the box edge, so overflow
+     (text past the right border) vs break (text kept inside) is visible, and
+     justify stretch reaches the right border only when spaces are expanded. */
+  .col   { width: 150px; border: 1px solid #888; padding: 4px 5px; background: #fafafa; }
+  .colN  { width: 130px; border: 1px solid #888; padding: 4px 5px; background: #fafafa; }
+  .colW  { border: 1px solid #888; padding: 4px 5px; background: #fafafa; display: inline-block; }
+  .badcol{ border-left: 4px solid #c33; }
+  .okcol { border-left: 4px solid #4a4; }
+  .ow-normal   { overflow-wrap: normal; word-break: normal; }
+  .ow-break    { overflow-wrap: break-word; }
+  .ow-anywhere { overflow-wrap: anywhere; }
+  .wb-all      { word-break: break-all; }
+  .wb-word     { word-break: break-word; }             /* legacy alias */
+  .wb-all-ow-n { word-break: break-all; overflow-wrap: normal; }
+  .hy-manual   { hyphens: manual; }
+  .hy-none     { hyphens: none; }
+  .j           { text-align: justify; }
+  .j-last-j    { text-align: justify; text-align-last: justify; }
+  .j-last-r    { text-align: justify; text-align-last: right; }
+  .j-last-c    { text-align: justify; text-align-last: center; }
+  .j-tjnone    { text-align: justify; text-justify: none; }
+</style>
+</head>
+<body>
+
+<h1>MacSurf line-breaker cluster</h1>
+<p class="lead">overflow-wrap &middot; word-break &middot; hyphens (soft-hyphen) &middot; text-align:justify / text-align-last.
+Columns are ~130&ndash;150px so breaks are forced; the box border marks the edge.</p>
+<p class="legend">
+  <span class="k-ok">GREEN = happy-path, should render correctly</span>
+  <span class="k-bad">RED = auditor-flagged DIVERGENCE (documents current wrong behavior)</span>
+</p>
+
+<!-- ============================================================= -->
+<h2>1. overflow-wrap / word-break</h2>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>overflow-wrap: break-word &mdash; long token is the FIRST box on the line
+    <div class="exp">Expected: the too-long word breaks mid-word to fit inside the border.</div></div>
+  <div class="col okcol ow-break">pneumonoultramicroscopicsilicovolcanoconiosis</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>word-break: break-all &mdash; long token is the FIRST box on the line
+    <div class="exp">Expected: token breaks between any two characters, filling each line.</div></div>
+  <div class="col okcol wb-all">supercalifragilisticexpialidocious</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE 3</span>word-break: break-all &mdash; long token is NOT the first box on the line
+    <div class="exp">Spec: fills the rest of line 1 then breaks mid-token. MacSurf: the whole token
+    wraps to a fresh line (inline_count==1 gate), so line&nbsp;1 keeps a ragged gap after &ldquo;hi&rdquo;.</div></div>
+  <div class="col badcol wb-all">hi supercalifragilisticexpialidocious</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE 4</span>word-break: break-all &mdash; preceded by a box, with a following breakable box
+    <div class="exp">Spec: break-all fills line 1 mid-token regardless of siblings. MacSurf: because the
+    token is not the first box, the mid-line break is suppressed and it wraps whole.</div></div>
+  <div class="col badcol wb-all">hi supercalifragilisticexpialidocious end</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE 5</span>word-break: break-all + overflow-wrap: normal &mdash; token not first box
+    <div class="exp">Spec: break-all applies independent of overflow-wrap and breaks mid-line.
+    MacSurf: precedence is right (break-all wins) but the shared inline_count gate still suppresses
+    the mid-line break on a non-first box &mdash; same ragged gap as #3.</div></div>
+  <div class="col badcol wb-all-ow-n">hi supercalifragilisticexpialidocious</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE 6</span>word-break: break-word (legacy alias) &mdash; NO overflow-wrap set
+    <div class="exp">Spec: legacy alias = word-break:normal + overflow-wrap:anywhere, so the overflowing
+    word MUST break. MacSurf: the value is not parsed (declaration dropped), word-break stays normal,
+    and with no overflow-wrap the token overflows past the right border instead of breaking.</div></div>
+  <div class="col badcol wb-word">pneumonoultramicroscopicsilicovolcanoconiosis</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">CONTROL</span>overflow-wrap: normal (default) &mdash; baseline, no break
+    <div class="exp">Expected: the long token overflows past the right border (nothing breaks it). This is the
+    correct default and the baseline that DIVERGENCE 6 should have differed from.</div></div>
+  <div class="col okcol ow-normal">pneumonoultramicroscopicsilicovolcanoconiosis</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>overflow-wrap: anywhere &mdash; long token is the FIRST box
+    <div class="exp">Expected: overflowing word breaks (like break-word) when it is the sole/first box.</div></div>
+  <div class="col okcol ow-anywhere">pneumonoultramicroscopicsilicovolcanoconiosis</div>
+</div>
+
+<!-- ============================================================= -->
+<h2>2. hyphens / soft hyphen (&amp;shy;)</h2>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>hyphens: manual &mdash; soft hyphen is the chosen wrap point
+    <div class="exp">Expected: the word wraps at a &amp;shy; and a visible &ldquo;-&rdquo; is left at the line end.</div></div>
+  <div class="colN okcol hy-manual">super&shy;cali&shy;fragi&shy;listic&shy;expiali&shy;docious</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>hyphens: none &mdash; soft hyphens must NOT create a break
+    <div class="exp">Expected: no break at any &amp;shy;; the token overflows the border and shows no &ldquo;-&rdquo;.</div></div>
+  <div class="colN okcol hy-none">super&shy;cali&shy;fragi&shy;listic&shy;expiali&shy;docious</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE (shy 3, highest risk)</span>soft hyphen at a styled-inline run boundary, mid-line
+    <div class="exp">Markup: <code>&lt;b&gt;ab&amp;shy;&lt;/b&gt;cd</code> on one wide line (no wrap). Spec: the &amp;shy; stays
+    invisible &mdash; render &ldquo;abcd&rdquo;. MacSurf: the &lt;b&gt; run ends at the shy (a style boundary, not a wrap),
+    the converter treats it as last-codepoint-of-run and paints a stray &ldquo;-&rdquo; &mdash; &ldquo;ab-cd&rdquo; &mdash; and even
+    reserves layout width for it.</div></div>
+  <div class="colW badcol"><b>ab&shy;</b>cd</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE (shy 4)</span>soft hyphen immediately before a forced &lt;br&gt;
+    <div class="exp">Markup: <code>foo&amp;shy;&lt;br&gt;bar</code>. Spec: no hyphen &mdash; the shy is not a wrap-chosen break,
+    so render &ldquo;foo&rdquo; / &ldquo;bar&rdquo;. MacSurf: the pre-&lt;br&gt; text box ends at the shy for a non-wrap reason,
+    tripping the same rule &mdash; stray &ldquo;foo-&rdquo; before the break.</div></div>
+  <div class="colW badcol">foo&shy;<br>bar</div>
+</div>
+
+<!-- ============================================================= -->
+<h2>3. text-align: justify / text-align-last</h2>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>text-align: justify &mdash; multi-line, default last line
+    <div class="exp">Expected: interior lines stretch to the right border (word spaces expanded); the LAST line
+    stays start/left-aligned (not stretched).</div></div>
+  <div class="col okcol j">The quick brown fox jumps over the lazy dog near the river bank at dawn.</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>text-align: justify + text-align-last: justify
+    <div class="exp">Expected: every line INCLUDING the last is stretched to the right border.</div></div>
+  <div class="col okcol j-last-j">The quick brown fox jumps over the lazy dog near the river bank at dawn.</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>text-align: justify + text-align-last: right
+    <div class="exp">Expected: interior lines justified; the last line is right-aligned.</div></div>
+  <div class="col okcol j-last-r">The quick brown fox jumps over the lazy dog near the river bank at dawn.</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">OK</span>text-align: justify + text-align-last: center
+    <div class="exp">Expected: interior lines justified; the last line is centered.</div></div>
+  <div class="col okcol j-last-c">The quick brown fox jumps over the lazy dog near the river bank at dawn.</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag ok">VERIFY</span>text-align: justify + text-justify: none
+    <div class="exp">Expected: justification DISABLED &mdash; no lines are stretched (word spaces stay natural),
+    behaving like plain left alignment.</div></div>
+  <div class="col okcol j-tjnone">The quick brown fox jumps over the lazy dog near the river bank at dawn.</div>
+</div>
+
+<div class="blk">
+  <div class="lbl"><span class="tag bad">DIVERGENCE (justify 2b/4b)</span>justified line that ENDS at a forced &lt;br&gt;
+    <div class="exp">Spec (CSS Text L3): the last line before a forced break is start-aligned, i.e. the line just
+    before the &lt;br&gt; is NOT stretched. MacSurf: the BR arm skips the last-line remap, so ta_align stays
+    justify and the pre-&lt;br&gt; line IS stretched to the full width. Watch the FIRST line below: it should be
+    naturally spaced but MacSurf spreads it edge-to-edge.</div></div>
+  <div class="col badcol j">The quick brown fox jumps<br>then trots home slowly to rest.</div>
+</div>
+
+<p class="lead" style="margin-top:18px;">End of cluster. Each RED block reproduces a specific auditor finding; each GREEN/CONTROL/VERIFY block should look correct.</p>
+
+</body>
+</html>
