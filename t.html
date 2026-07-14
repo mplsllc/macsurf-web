@@ -3,105 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MacSurf line-breaker trouble spots (hyphens / justify-br / shy)</title>
+<title>MacSurf intrinsic sizing (flex / grid / table content-sizing) vs Chrome</title>
 <style>
-  body { font: 17px/1.4 Geneva, Verdana, sans-serif; margin: 14px; color: #111; background: #fff; }
-  h1 { font-size: 20px; margin: 0 0 10px; }
-  h2 { font-size: 18px; margin: 26px 0 8px; border-bottom: 2px solid #333; padding-bottom: 3px; }
-  .lbl { font-size: 14px; font-weight: bold; margin: 0 0 4px; }
-  .exp { font-size: 13px; color: #555; font-weight: normal; margin-top: 2px; }
-  .blk { margin: 0 0 22px; }
-  /* Test columns: BIG font so a stray/real hyphen is unmistakable; the border is
-     the box edge, so overflow (text past the border) vs break is obvious. */
-  .col   { width: 230px; border: 2px solid #888; padding: 8px 10px; background: #fafafa;
-           font-size: 30px; line-height: 1.25; }
-  .colW  { border: 2px solid #888; padding: 8px 10px; background: #fafafa;
-           font-size: 30px; display: inline-block; }
-  .bad { border-left: 6px solid #c33; }
-  .ok  { border-left: 6px solid #4a4; }
-  .hy-manual { hyphens: manual; }
-  .hy-none   { hyphens: none; }
-  .j         { text-align: justify; }
+  body { font: 16px/1.35 Geneva, Verdana, sans-serif; margin: 14px; color: #111; background: #fff; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  h2 { font-size: 16px; margin: 22px 0 6px; border-bottom: 2px solid #333; padding-bottom: 2px; }
+  .lead { font-size: 12px; color: #444; margin: 0 0 12px; }
+  .lbl { font-size: 13px; font-weight: bold; margin: 10px 0 4px; }
+  .exp { font-size: 12px; color: #555; font-weight: normal; margin-top: 2px; }
+  /* Every test box is bordered so column/item edges are visible; the OUTER
+     container has a fixed width so overflow vs clip vs collapse is obvious. */
+  .cont  { border: 2px solid #333; background: #f4f4f4; margin-top: 4px; }
+  .flex  { display: flex; }
+  .item  { border: 1px solid #c33; background: #fdeaea; padding: 3px 5px; font-size: 20px; }
+  .grid2 { display: grid; grid-template-columns: auto auto; }
+  .gcell { border: 1px solid #38c; background: #eaf2fd; padding: 3px 5px; font-size: 18px; }
+  table.t { border-collapse: collapse; }
+  table.t td { border: 1px solid #7a3; background: #eefae2; padding: 3px 6px; font-size: 18px; }
+  .w300 { width: 300px; }
+  .w200 { width: 200px; }
+  .w320 { width: 320px; }
 </style>
 </head>
 <body>
 
-<h1>MacSurf line-breaker &mdash; trouble spots (closer look)</h1>
+<h1>Intrinsic sizing &mdash; flex / grid / table content-sizing</h1>
+<p class="lead">Each OUTER box has a fixed width (heavy border). Compare each to Chrome. The question in every case: do items/columns size to their CONTENT, or collapse/clip/blow&nbsp;out?</p>
 
 <!-- ============================================================= -->
-<h2>1. hyphens &mdash; the manual vs none mystery</h2>
+<h2>1. flex &mdash; item with a long unbreakable token</h2>
+<div class="lbl">1a. single flex item, content = one long word, container 300px
+  <div class="exp">Chrome: the item can't shrink below its longest word (min-content), so it holds that width; the word stays readable. BROKEN if the item collapses to a sliver and clips, or drops to zero width.</div></div>
+<div class="cont w300 flex"><div class="item" style="flex:1">pneumonoultramicroscopicsilicovolcanoconiosis</div></div>
 
-<div class="blk">
-  <div class="lbl">1a. CONTROL &mdash; plain long word, NO soft hyphens (hyphens: manual)
-    <div class="exp">Expected: no break opportunities at all &rarr; the word overflows past the right border. Baseline for "what a non-breaking word looks like".</div></div>
-  <div class="col ok hy-manual">supercalifragilisticexpialidocious</div>
-</div>
-
-<div class="blk">
-  <div class="lbl">1b. hyphens: manual &mdash; SAME word but with &amp;shy; between each syllable
-    <div class="exp">Expected: wraps at a soft hyphen, ONE "-" at the line end only; the shy points that do NOT wrap stay invisible. NOT a "-" between every syllable.</div></div>
-  <div class="col ok hy-manual">super&shy;cali&shy;fragi&shy;listic&shy;expiali&shy;docious</div>
-</div>
-
-<div class="blk">
-  <div class="lbl">1c. hyphens: none &mdash; identical &amp;shy; word
-    <div class="exp">Expected: soft hyphens create NO break &rarr; the word overflows the border exactly like 1a, and shows NO "-" anywhere. Must look DIFFERENT from 1b.</div></div>
-  <div class="col bad hy-none">super&shy;cali&shy;fragi&shy;listic&shy;expiali&shy;docious</div>
-</div>
-
-<div class="blk">
-  <div class="lbl">1d. hyphens: manual &mdash; exactly ONE soft hyphen in the middle
-    <div class="exp">Expected: breaks at the single shy &rarr; "aaaaaaaaaa-" on line 1, "bbbbbbbbbb" on line 2. One hyphen, one break.</div></div>
-  <div class="col ok hy-manual">aaaaaaaaaa&shy;bbbbbbbbbb</div>
-</div>
-
-<div class="blk">
-  <div class="lbl">1e. hyphens: none &mdash; same single-shy word
-    <div class="exp">Expected: no break &rarr; "aaaaaaaaaabbbbbbbbbb" overflows the border, no "-".</div></div>
-  <div class="col bad hy-none">aaaaaaaaaa&shy;bbbbbbbbbb</div>
+<!-- ============================================================= -->
+<h2>2. flex &mdash; several items competing for one row</h2>
+<div class="lbl">2a. three flex:1 items, unequal content, container 320px
+  <div class="exp">Chrome: three columns share the row, each at least its min-content; they fit (or overflow gracefully) without one blowing out or overlapping the others.</div></div>
+<div class="cont w320 flex">
+  <div class="item" style="flex:1">short</div>
+  <div class="item" style="flex:1">a much longer run of words here</div>
+  <div class="item" style="flex:1">middling text</div>
 </div>
 
 <!-- ============================================================= -->
-<h2>2. soft hyphen at a boundary (phantom "-", issue #275)</h2>
+<h2>3. flex &mdash; content WIDER than the container (the pathological one)</h2>
+<div class="lbl">3a. flex item whose long word exceeds the 200px container
+  <div class="exp">Chrome: item = min-content (the word); it OVERFLOWS the 200px container (word extends past the heavy border, still readable). BROKEN if the word is clipped at 200px or the item collapses. This is where min-content vs max-content resolution decides clip-vs-overflow.</div></div>
+<div class="cont w200 flex"><div class="item">pneumonoultramicroscopicsilicovolcanoconiosis</div></div>
 
-<div class="blk">
-  <div class="lbl">2a. shy at a styled-inline boundary: <code>&lt;b&gt;ab&amp;shy;&lt;/b&gt;cd</code> (wide, no wrap)
-    <div class="exp">Expected: "abcd" &mdash; the shy is mid-word, no wrap here, so it stays invisible. Bug: a stray "-" appears ("ab-cd").</div></div>
-  <div class="colW bad"><b>ab&shy;</b>cd</div>
+<!-- ============================================================= -->
+<h2>4. grid &mdash; auto tracks sizing to content (PRIME SUSPECT)</h2>
+<div class="lbl">4a. grid-template-columns: auto auto; unequal cell content, container 300px
+  <div class="exp">Chrome: col 1 shrinks to fit "id" (narrow), col 2 takes the rest and wraps its long text. BROKEN if both columns are equal width, or the content doesn't size the tracks at all (grid may not read the min/max-content solver here).</div></div>
+<div class="cont w300 grid2">
+  <div class="gcell">id</div>
+  <div class="gcell">a longer cell of text that should wrap inside its own auto track</div>
 </div>
 
-<div class="blk">
-  <div class="lbl">2b. shy immediately before a forced break: <code>foo&amp;shy;&lt;br&gt;bar</code>
-    <div class="exp">Expected: "foo" / "bar" &mdash; the &lt;br&gt; is the break, not the shy, so no "-". Bug: "foo-" before the break.</div></div>
-  <div class="colW bad">foo&shy;<br>bar</div>
+<div class="lbl">4b. grid-template-columns: auto 1fr; container 300px
+  <div class="exp">Chrome: col 1 = content width of "Name:", col 2 = remaining space. BROKEN if col 1 doesn't shrink to its content.</div></div>
+<div class="cont w300" style="display:grid; grid-template-columns:auto 1fr;">
+  <div class="gcell">Name:</div>
+  <div class="gcell">value fills the rest of the row</div>
 </div>
 
 <!-- ============================================================= -->
-<h2>3. justify &mdash; line before a forced &lt;br&gt;</h2>
+<h2>5. table &mdash; no declared width, lopsided cells (auto algorithm)</h2>
+<div class="lbl">5a. table with no width; one tiny cell, one long cell
+  <div class="exp">Chrome: col 1 shrinks to fit "x"; col 2 grows to fit its content; the table is exactly as wide as its content needs. BROKEN if the two columns come out equal width, or the table stretches full-width and wastes space.</div></div>
+<table class="t"><tr>
+  <td>x</td>
+  <td>a much longer cell with a lot of text content to force the auto column algorithm to give this column more width than the first</td>
+</tr></table>
 
-<div class="blk">
-  <div class="lbl">3a. justified block whose first paragraph ends at a &lt;br&gt;
-    <div class="exp">Expected (CSS Text L3): the line right before the &lt;br&gt; is start/left-aligned, NOT stretched. So "The quick brown fox jumps" should be naturally spaced. Bug: it gets spread edge-to-edge.</div></div>
-  <div class="col bad j">The quick brown fox jumps<br>then trots home slowly to rest.</div>
-</div>
+<div class="lbl">5b. same table, but col 1 has a long unbreakable token
+  <div class="exp">Chrome: col 1 = min-content of the token (can't shrink below it); col 2 takes the rest. BROKEN if col 1 clips the token or the columns come out equal.</div></div>
+<table class="t"><tr>
+  <td>supercalifragilisticexpialidocious</td>
+  <td>second column, ordinary wrapping text that yields the remaining width</td>
+</tr></table>
 
-<div class="blk">
-  <div class="lbl">3b. CONTROL &mdash; same text justified with NO &lt;br&gt;
-    <div class="exp">Expected: interior lines stretched to the border; only the true LAST line ("rest.") left-aligned.</div></div>
-  <div class="col ok j">The quick brown fox jumps then trots home slowly to rest.</div>
-</div>
+<p class="lead" style="margin-top:20px;">If flex (1&ndash;3) and table (5) render like Chrome but grid (4) does not, the missing #62 work is grid-track intrinsic sizing (solver-consumption), not the keyword pipeline.</p>
 
-
-<div class="blk">
-  <div class="lbl">1f. LITERAL U+00AD byte in the source (NOT &amp;shy;) — does the raw soft-hyphen byte survive to font_split?
-    <div class="exp">Prices the parser fix. This word has ACTUAL U+00AD bytes, not the &shy; entity. If the fixes810b byte-dump now shows c2 ad (or this renders differently from 1b), the strip is in ENTITY DECODE = narrow/cheap. If still len=34/stripped, the strip is in DOM text normalization = deep.</div></div>
-  <div class="col ok hy-manual">super­califragilistic­expialidocious</div>
-</div>
-
-<div class="blk">
-  <div class="lbl">1g. shy on a STYLE boundary: super<b>cali&shy;</b>docious (known limitation #275)
-    <div class="exp">The &shy; sits at the edge of the &lt;b&gt; run, so it fragments across a different style and the fixes811 same-style coalesce can NOT merge it. Expected after the fix: 1b/1c/1d/1e read clean; THIS row may still show a stray "-" at the bold boundary. Documents the deliberate gap, not a regression.</div></div>
-  <div class="col hy-manual" style="border-left:6px solid #c93">super<b>cali­</b>docious</div>
-</div>
 </body>
 </html>
