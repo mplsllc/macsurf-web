@@ -91,5 +91,11 @@
   <div class="col ok j">The quick brown fox jumps then trots home slowly to rest.</div>
 </div>
 
+
+<div class="blk">
+  <div class="lbl">1f. LITERAL U+00AD byte in the source (NOT &amp;shy;) — does the raw soft-hyphen byte survive to font_split?
+    <div class="exp">Prices the parser fix. This word has ACTUAL U+00AD bytes, not the &shy; entity. If the fixes810b byte-dump now shows c2 ad (or this renders differently from 1b), the strip is in ENTITY DECODE = narrow/cheap. If still len=34/stripped, the strip is in DOM text normalization = deep.</div></div>
+  <div class="col ok hy-manual">super­califragilistic­expialidocious</div>
+</div>
 </body>
 </html>
