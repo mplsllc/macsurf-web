@@ -97,5 +97,11 @@
     <div class="exp">Prices the parser fix. This word has ACTUAL U+00AD bytes, not the &shy; entity. If the fixes810b byte-dump now shows c2 ad (or this renders differently from 1b), the strip is in ENTITY DECODE = narrow/cheap. If still len=34/stripped, the strip is in DOM text normalization = deep.</div></div>
   <div class="col ok hy-manual">super­califragilistic­expialidocious</div>
 </div>
+
+<div class="blk">
+  <div class="lbl">1g. shy on a STYLE boundary: super<b>cali&shy;</b>docious (known limitation #275)
+    <div class="exp">The &shy; sits at the edge of the &lt;b&gt; run, so it fragments across a different style and the fixes811 same-style coalesce can NOT merge it. Expected after the fix: 1b/1c/1d/1e read clean; THIS row may still show a stray "-" at the bold boundary. Documents the deliberate gap, not a regression.</div></div>
+  <div class="col hy-manual" style="border-left:6px solid #c93">super<b>cali­</b>docious</div>
+</div>
 </body>
 </html>
