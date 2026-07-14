@@ -69,6 +69,22 @@
 </div>
 
 <!-- ============================================================= -->
+<div class="lbl">4c. CONSTRAINED: grid-template-columns: auto 1fr, container only 180px, auto content too wide
+  <div class="exp">The catch case for a wrong algorithm. Chrome: the auto column can't fit its max-content in 180px, so it SHRINKS toward its min-content (longest word), and 1fr gets the small remainder (not zero, not the whole row). A naive "auto=max-content then fr=rest" gets this wrong; correct spec order (min-content base, grow with available space, fr divides what's left) matches Chrome.</div></div>
+<div class="cont" style="width:180px; display:grid; grid-template-columns:auto 1fr;">
+  <div class="gcell">reallyquitewidecontent here</div>
+  <div class="gcell">1fr</div>
+</div>
+
+<div class="lbl">4d: grid-template-columns: auto auto auto, wide container, three very different cell widths
+  <div class="exp">Chrome: the three auto columns size INDEPENDENTLY to their own content (narrow / medium / wide) &mdash; NOT three equal columns. BROKEN if they come out equal (re-averaging instead of per-track content sizing).</div></div>
+<div class="cont" style="width:400px; display:grid; grid-template-columns:auto auto auto;">
+  <div class="gcell">a</div>
+  <div class="gcell">medium text</div>
+  <div class="gcell">a considerably longer cell of content</div>
+</div>
+
+<!-- ============================================================= -->
 <h2>5. table &mdash; no declared width, lopsided cells (auto algorithm)</h2>
 <div class="lbl">5a. table with no width; one tiny cell, one long cell
   <div class="exp">Chrome: col 1 shrinks to fit "x"; col 2 grows to fit its content; the table is exactly as wide as its content needs. BROKEN if the two columns come out equal width, or the table stretches full-width and wastes space.</div></div>
