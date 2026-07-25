@@ -1,106 +1,206 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MacSurf intrinsic sizing (flex / grid / table content-sizing) vs Chrome</title>
+<title>issue-close verification (audit 2026-07-25)</title>
 <style>
-  body { font: 16px/1.35 Geneva, Verdana, sans-serif; margin: 14px; color: #111; background: #fff; }
-  h1 { font-size: 19px; margin: 0 0 6px; }
-  h2 { font-size: 16px; margin: 22px 0 6px; border-bottom: 2px solid #333; padding-bottom: 2px; }
-  .lead { font-size: 12px; color: #444; margin: 0 0 12px; }
-  .lbl { font-size: 13px; font-weight: bold; margin: 10px 0 4px; }
-  .exp { font-size: 12px; color: #555; font-weight: normal; margin-top: 2px; }
-  /* Every test box is bordered so column/item edges are visible; the OUTER
-     container has a fixed width so overflow vs clip vs collapse is obvious. */
-  .cont  { border: 2px solid #333; background: #f4f4f4; margin-top: 4px; }
-  .flex  { display: flex; }
-  .item  { border: 1px solid #c33; background: #fdeaea; padding: 3px 5px; font-size: 20px; }
-  .grid2 { display: grid; grid-template-columns: auto auto; }
-  .gcell { border: 1px solid #38c; background: #eaf2fd; padding: 3px 5px; font-size: 18px; }
-  table.t { border-collapse: collapse; }
-  table.t td { border: 1px solid #7a3; background: #eefae2; padding: 3px 6px; font-size: 18px; }
-  .w300 { width: 300px; }
-  .w200 { width: 200px; }
-  .w320 { width: 320px; }
+  body { font: 15px Geneva, sans-serif; margin: 16px; }
+  h1 { font-size: 18px; margin: 0 0 2px; }
+  h2 { font-size: 13px; margin: 14px 0 4px; }
+  p.n { color: #666; font-size: 12px; margin: 2px 0 8px; }
+  .r { font-weight: bold; padding: 2px 6px; display: block; margin: 2px 0; }
+  .wait { background: #ddd; color: #444; }
+  .pass { background: #1a7f37; color: #fff; }
+  .fail { background: #b3261e; color: #fff; }
+
+  /* #126 — ARIA attribute selectors. Red unless the matcher fires. */
+  .ab { padding: 3px 6px; margin: 2px 0; border: 1px solid #99a; background: #b3261e; color: #fff; }
+  #a1[aria-expanded="true"]     { background: #1a7f37; }
+  #a2[aria-label|="main"]       { background: #1a7f37; }
+  #a3[aria-controls^="panel"]   { background: #1a7f37; }
+  #a4[aria-describedby$="-help"]{ background: #1a7f37; }
+  #a5[aria-labelledby*="mid"]   { background: #1a7f37; }
+
+  /* #280 — external SVG as a CSS background */
+  /* background-size:contain is REQUIRED — puffy.svg is 1051x874 intrinsic,
+     so without it the 64px box centres on blank belly and reads as a false
+     failure (confirmed in Chrome while building this page). */
+  #svgbg { width: 64px; height: 64px; border: 1px solid #99a;
+           background: url("puffy.svg") no-repeat center;
+           background-size: contain; }
+  #svgimg { border: 1px solid #99a; }
+  .svgrow { margin: 4px 0; }
+  .svgrow span { vertical-align: top; display: inline-block; padding-top: 22px; }
 </style>
 </head>
 <body>
+<h1>Issue-close verification &mdash; audit 2026-07-25</h1>
+<p class="n">Green = the claim holds, red = it does not. One screenshot covers every row.
+Probes run inline at end of body, so nothing here depends on the window <code>load</code>
+event (MACSURF_JS_FIRE_LOAD ships OFF) and nothing calls getBoundingClientRect
+(MACSURF_JS_GEOMETRY ships OFF). The fixes997 submit/click page from last round is gone.</p>
 
-<h1>Intrinsic sizing &mdash; flex / grid / table content-sizing</h1>
-<p class="lead">Each OUTER box has a fixed width (heavy border). Compare each to Chrome. The question in every case: do items/columns size to their CONTENT, or collapse/clip/blow&nbsp;out?</p>
+<!-- ---------------------------------------------------------------- #126 -->
+<h2>#126 &mdash; ARIA attribute selectors (pure CSS, no JS)</h2>
+<div class="ab" id="a1" aria-expanded="true">[aria-expanded="true"] &mdash; exact</div>
+<div class="ab" id="a2" aria-label="main-nav">[aria-label|="main"] &mdash; dash-prefix</div>
+<div class="ab" id="a3" aria-controls="panel-1">[aria-controls^="panel"] &mdash; prefix</div>
+<div class="ab" id="a4" aria-describedby="field-help">[aria-describedby$="-help"] &mdash; suffix</div>
+<div class="ab" id="a5" aria-labelledby="a-mid-b">[aria-labelledby*="mid"] &mdash; substring</div>
 
-<!-- ============================================================= -->
-<h2>1. flex &mdash; item with a long unbreakable token</h2>
-<div class="lbl">1a. single flex item, content = one long word, container 300px
-  <div class="exp">Chrome: the item can't shrink below its longest word (min-content), so it holds that width; the word stays readable. BROKEN if the item collapses to a sliver and clips, or drops to zero width.</div></div>
-<div class="cont w300 flex"><div class="item" style="flex:1">pneumonoultramicroscopicsilicovolcanoconiosis</div></div>
-
-<!-- ============================================================= -->
-<h2>2. flex &mdash; several items competing for one row</h2>
-<div class="lbl">2a. three flex:1 items, unequal content, container 320px
-  <div class="exp">Chrome: three columns share the row, each at least its min-content; they fit (or overflow gracefully) without one blowing out or overlapping the others.</div></div>
-<div class="cont w320 flex">
-  <div class="item" style="flex:1">short</div>
-  <div class="item" style="flex:1">a much longer run of words here</div>
-  <div class="item" style="flex:1">middling text</div>
+<!-- ---------------------------------------------------------------- #280 -->
+<h2>#280 &mdash; external SVG as an image</h2>
+<p class="n">Both boxes must show artwork. Blank = still broken.</p>
+<div class="svgrow">
+  <span>&lt;img src="puffy.svg"&gt;&nbsp;</span>
+  <img id="svgimg" src="puffy.svg" width="64" height="64" alt="svg via img">
+  <span>&nbsp;&nbsp;CSS background url(*.svg)&nbsp;</span>
+  <div id="svgbg" style="display:inline-block"></div>
 </div>
 
-<!-- ============================================================= -->
-<h2>3. flex &mdash; content WIDER than the container (the pathological one)</h2>
-<div class="lbl">3a. flex item whose long word exceeds the 200px container
-  <div class="exp">Chrome: item = min-content (the word); it OVERFLOWS the 200px container (word extends past the heavy border, still readable). BROKEN if the word is clipped at 200px or the item collapses. This is where min-content vs max-content resolution decides clip-vs-overflow.</div></div>
-<div class="cont w200 flex"><div class="item">pneumonoultramicroscopicsilicovolcanoconiosis</div></div>
+<!-- ------------------------------------------------------------ JS probes -->
+<h2>JS / DOM probes</h2>
+<div id="out"></div>
 
-<!-- ============================================================= -->
-<h2>4. grid &mdash; auto tracks sizing to content (PRIME SUSPECT)</h2>
-<div class="lbl">4a. grid-template-columns: auto auto; unequal cell content, container 300px
-  <div class="exp">Chrome: col 1 shrinks to fit "id" (narrow), col 2 takes the rest and wraps its long text. BROKEN if both columns are equal width, or the content doesn't size the tracks at all (grid may not read the min/max-content solver here).</div></div>
-<div class="cont w300 grid2">
-  <div class="gcell">id</div>
-  <div class="gcell">a longer cell of text that should wrap inside its own auto track</div>
+<!-- #303 target: rewritten by setTimeout AFTER first paint -->
+<div id="repaint" style="padding:4px;margin-top:6px;background:#ddd">
+  #303 &mdash; if this line never changes, JS mutation did not repaint.
 </div>
 
-<div class="lbl">4b. grid-template-columns: auto 1fr; container 300px
-  <div class="exp">Chrome: col 1 = content width of "Name:", col 2 = remaining space. BROKEN if col 1 doesn't shrink to its content.</div></div>
-<div class="cont w300" style="display:grid; grid-template-columns:auto 1fr;">
-  <div class="gcell">Name:</div>
-  <div class="gcell">value fills the rest of the row</div>
+<!-- fixture for the DOM probes -->
+<div id="fixture" style="display:none">
+  <p class="fx">alpha</p><p class="fx">beta</p><p class="fx">gamma</p>
 </div>
 
-<!-- ============================================================= -->
-<div class="lbl">4c. CONSTRAINED: grid-template-columns: auto 1fr, container only 180px, auto content too wide
-  <div class="exp">The catch case for a wrong algorithm. Chrome: the auto column can't fit its max-content in 180px, so it SHRINKS toward its min-content (longest word), and 1fr gets the small remainder (not zero, not the whole row). A naive "auto=max-content then fr=rest" gets this wrong; correct spec order (min-content base, grow with available space, fr divides what's left) matches Chrome.</div></div>
-<div class="cont" style="width:180px; display:grid; grid-template-columns:auto 1fr;">
-  <div class="gcell">reallyquitewidecontent here</div>
-  <div class="gcell">1fr</div>
-</div>
+<script>
+var out = document.getElementById('out');
 
-<div class="lbl">4d: grid-template-columns: auto auto auto, wide container, three very different cell widths
-  <div class="exp">Chrome: the three auto columns size INDEPENDENTLY to their own content (narrow / medium / wide) &mdash; NOT three equal columns. BROKEN if they come out equal (re-averaging instead of per-track content sizing).</div></div>
-<div class="cont" style="width:400px; display:grid; grid-template-columns:auto auto auto;">
-  <div class="gcell">a</div>
-  <div class="gcell">medium text</div>
-  <div class="gcell">a considerably longer cell of content</div>
-</div>
+function line(id, label, cls, detail) {
+  var d = document.createElement('span');
+  d.className = 'r ' + cls;
+  d.textContent = id + '  ' + label + (detail ? '  -  ' + detail : '');
+  out.appendChild(d);
+  return d;
+}
+function check(id, label, fn) {
+  var r;
+  try { r = fn(); }
+  catch (e) { line(id, label, 'fail', 'THREW: ' + e); return; }
+  line(id, label, r.ok ? 'pass' : 'fail', r.msg);
+}
 
-<!-- ============================================================= -->
-<h2>5. table &mdash; no declared width, lopsided cells (auto algorithm)</h2>
-<div class="lbl">5a. table with no width; one tiny cell, one long cell
-  <div class="exp">Chrome: col 1 shrinks to fit "x"; col 2 grows to fit its content; the table is exactly as wide as its content needs. BROKEN if the two columns come out equal width, or the table stretches full-width and wastes space.</div></div>
-<table class="t"><tr>
-  <td>x</td>
-  <td>a much longer cell with a lot of text content to force the auto column algorithm to give this column more width than the first</td>
-</tr></table>
+/* #29 - querySelector / querySelectorAll, incl. compound + descendant */
+check('#29', 'querySelector + compound selectors', function () {
+  var one  = document.querySelector('#fixture p.fx');
+  var many = document.querySelectorAll('#fixture p.fx');
+  return { ok: one !== null && many.length === 3,
+           msg: 'one=' + (one ? one.textContent : 'null') + ', all=' + many.length + ' (want 3)' };
+});
 
-<div class="lbl">5b. same table, but col 1 has a long unbreakable token
-  <div class="exp">Chrome: col 1 = min-content of the token (can't shrink below it); col 2 takes the rest. BROKEN if col 1 clips the token or the columns come out equal.</div></div>
-<table class="t"><tr>
-  <td>supercalifragilisticexpialidocious</td>
-  <td>second column, ordinary wrapping text that yields the remaining width</td>
-</tr></table>
+/* #261 - getElementsByClassName / getElementsByTagName, incl. element-scoped */
+check('#261', 'getElementsByClassName / TagName', function () {
+  var byClass = document.getElementsByClassName('fx');
+  var byTag   = document.getElementById('fixture').getElementsByTagName('p');
+  return { ok: byClass.length === 3 && byTag.length === 3,
+           msg: 'byClass=' + byClass.length + ', scoped byTag=' + byTag.length + ' (want 3/3)' };
+});
 
-<p class="lead" style="margin-top:20px;">If flex (1&ndash;3) and table (5) render like Chrome but grid (4) does not, the missing #62 work is grid-track intrinsic sizing (solver-consumption), not the keyword pipeline.</p>
+/* #263 - non-element traversal + real text nodes */
+check('#263', 'childNodes / firstChild / nextSibling / text nodes', function () {
+  var p = document.querySelector('#fixture p.fx');
+  var t = p.firstChild;
+  var host = document.createElement('div');
+  host.appendChild(document.createTextNode('one'));
+  host.appendChild(document.createElement('b'));
+  var kinds = [];
+  for (var n = host.firstChild; n; n = n.nextSibling) kinds.push(n.nodeType);
+  return { ok: !!t && t.nodeType === 3 && t.nodeValue === 'alpha' && kinds.join(',') === '3,1',
+           msg: 'firstChild type=' + (t ? t.nodeType : '?') + ' value=' + (t ? t.nodeValue : '?') +
+                ', kinds=[' + kinds.join(',') + '] (want 3,1)' };
+});
 
+/* #264 - capture -> target -> bubble ordering through a real dispatch */
+check('#264', 'event capture / target / bubble order', function () {
+  var order = [];
+  var outer = document.createElement('div');
+  var inner = document.createElement('span');
+  outer.appendChild(inner);
+  document.body.appendChild(outer);
+  outer.addEventListener('click', function () { order.push('cap'); }, true);
+  inner.addEventListener('click', function () { order.push('target'); }, false);
+  outer.addEventListener('click', function () { order.push('bubble'); }, false);
+  var ev;
+  if (document.createEvent) { ev = document.createEvent('MouseEvents'); ev.initEvent('click', true, true); }
+  else { ev = new Event('click', { bubbles: true }); }
+  inner.dispatchEvent(ev);
+  document.body.removeChild(outer);
+  return { ok: order.join(',') === 'cap,target,bubble',
+           msg: 'order=[' + order.join(',') + '] (want cap,target,bubble)' };
+});
+
+/* #182 - XenForo preamble hiddenscroll: append, read parentNode, removeChild */
+check('#182', 'hiddenscroll: append then parentNode.removeChild', function () {
+  var b = document.createElement('div');
+  b.style.width = '100px'; b.style.height = '100px'; b.style.overflow = 'scroll';
+  document.body.appendChild(b);
+  var pn = b.parentNode;
+  if (!pn) return { ok: false, msg: 'parentNode was NULL right after appendChild' };
+  pn.removeChild(b);
+  return { ok: b.parentNode === null,
+           msg: 'parentNode resolved after append; removeChild OK; now ' + b.parentNode };
+});
+
+/* #303 - a mutation after first paint must repaint (reconvert no longer fenced) */
+(function () {
+  var d = line('#303', 'JS mutation after first paint repaints', 'wait', 'pending...');
+  setTimeout(function () {
+    var t = document.getElementById('repaint');
+    t.textContent = '#303 - this sentence was written by setTimeout AFTER first paint.';
+    t.style.background = '#1a7f37';
+    t.style.color = '#fff';
+    d.className = 'r pass';
+    d.textContent = '#303  JS mutation after first paint repaints  -  green line below is the proof';
+  }, 400);
+})();
+
+/* #222 - real XMLHttpRequest over the network */
+(function () {
+  var d = line('#222', 'XMLHttpRequest (real network)', 'wait', 'pending...');
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'puffy.svg', true);
+    x.onreadystatechange = function () {
+      if (x.readyState !== 4) return;
+      var n = x.responseText ? x.responseText.length : 0;
+      d.className = 'r ' + (x.status === 200 && n > 0 ? 'pass' : 'fail');
+      d.textContent = '#222  XMLHttpRequest (real network)  -  status=' + x.status + ' bytes=' + n;
+    };
+    x.send();
+  } catch (e) {
+    d.className = 'r fail';
+    d.textContent = '#222  XMLHttpRequest  -  THREW: ' + e;
+  }
+})();
+
+/* #104 - fetch() as a real Promise over the network */
+(function () {
+  var d = line('#104', 'fetch() returns a real Promise', 'wait', 'pending...');
+  if (typeof fetch !== 'function') {
+    d.className = 'r fail';
+    d.textContent = '#104  fetch()  -  NOT A FUNCTION';
+    return;
+  }
+  fetch('puffy.svg').then(function (r) {
+    return r.text().then(function (t) {
+      d.className = 'r ' + (r.ok && t.length > 0 ? 'pass' : 'fail');
+      d.textContent = '#104  fetch() returns a real Promise  -  ok=' + r.ok +
+                      ' status=' + r.status + ' bytes=' + t.length;
+    });
+  })['catch'](function (e) {
+    d.className = 'r fail';
+    d.textContent = '#104  fetch()  -  REJECTED: ' + e;
+  });
+})();
+</script>
 </body>
 </html>
