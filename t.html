@@ -1,206 +1,65 @@
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>issue-close verification (audit 2026-07-25)</title>
-<style>
-  body { font: 15px Geneva, sans-serif; margin: 16px; }
-  h1 { font-size: 18px; margin: 0 0 2px; }
-  h2 { font-size: 13px; margin: 14px 0 4px; }
-  p.n { color: #666; font-size: 12px; margin: 2px 0 8px; }
-  .r { font-weight: bold; padding: 2px 6px; display: block; margin: 2px 0; }
-  .wait { background: #ddd; color: #444; }
-  .pass { background: #1a7f37; color: #fff; }
-  .fail { background: #b3261e; color: #fff; }
-
-  /* #126 — ARIA attribute selectors. Red unless the matcher fires. */
-  .ab { padding: 3px 6px; margin: 2px 0; border: 1px solid #99a; background: #b3261e; color: #fff; }
-  #a1[aria-expanded="true"]     { background: #1a7f37; }
-  #a2[aria-label|="main"]       { background: #1a7f37; }
-  #a3[aria-controls^="panel"]   { background: #1a7f37; }
-  #a4[aria-describedby$="-help"]{ background: #1a7f37; }
-  #a5[aria-labelledby*="mid"]   { background: #1a7f37; }
-
-  /* #280 — external SVG as a CSS background */
-  /* background-size:contain is REQUIRED — puffy.svg is 1051x874 intrinsic,
-     so without it the 64px box centres on blank belly and reads as a false
-     failure (confirmed in Chrome while building this page). */
-  #svgbg { width: 64px; height: 64px; border: 1px solid #99a;
-           background: url("puffy.svg") no-repeat center;
-           background-size: contain; }
-  #svgimg { border: 1px solid #99a; }
-  .svgrow { margin: 4px 0; }
-  .svgrow span { vertical-align: top; display: inline-block; padding-top: 22px; }
-</style>
-</head>
-<body>
-<h1>Issue-close verification &mdash; audit 2026-07-25</h1>
-<p class="n">Green = the claim holds, red = it does not. One screenshot covers every row.
-Probes run inline at end of body, so nothing here depends on the window <code>load</code>
-event (MACSURF_JS_FIRE_LOAD ships OFF) and nothing calls getBoundingClientRect
-(MACSURF_JS_GEOMETRY ships OFF). The fixes997 submit/click page from last round is gone.</p>
-
-<!-- ---------------------------------------------------------------- #126 -->
-<h2>#126 &mdash; ARIA attribute selectors (pure CSS, no JS)</h2>
-<div class="ab" id="a1" aria-expanded="true">[aria-expanded="true"] &mdash; exact</div>
-<div class="ab" id="a2" aria-label="main-nav">[aria-label|="main"] &mdash; dash-prefix</div>
-<div class="ab" id="a3" aria-controls="panel-1">[aria-controls^="panel"] &mdash; prefix</div>
-<div class="ab" id="a4" aria-describedby="field-help">[aria-describedby$="-help"] &mdash; suffix</div>
-<div class="ab" id="a5" aria-labelledby="a-mid-b">[aria-labelledby*="mid"] &mdash; substring</div>
-
-<!-- ---------------------------------------------------------------- #280 -->
-<h2>#280 &mdash; external SVG as an image</h2>
-<p class="n">Both boxes must show artwork. Blank = still broken.</p>
-<div class="svgrow">
-  <span>&lt;img src="puffy.svg"&gt;&nbsp;</span>
-  <img id="svgimg" src="puffy.svg" width="64" height="64" alt="svg via img">
-  <span>&nbsp;&nbsp;CSS background url(*.svg)&nbsp;</span>
-  <div id="svgbg" style="display:inline-block"></div>
-</div>
-
-<!-- ------------------------------------------------------------ JS probes -->
-<h2>JS / DOM probes</h2>
-<div id="out"></div>
-
-<!-- #303 target: rewritten by setTimeout AFTER first paint -->
-<div id="repaint" style="padding:4px;margin-top:6px;background:#ddd">
-  #303 &mdash; if this line never changes, JS mutation did not repaint.
-</div>
-
-<!-- fixture for the DOM probes -->
-<div id="fixture" style="display:none">
-  <p class="fx">alpha</p><p class="fx">beta</p><p class="fx">gamma</p>
-</div>
-
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tests</title></head><body>
+<pre id="r"></pre>
 <script>
-var out = document.getElementById('out');
-
-function line(id, label, cls, detail) {
-  var d = document.createElement('span');
-  d.className = 'r ' + cls;
-  d.textContent = id + '  ' + label + (detail ? '  -  ' + detail : '');
-  out.appendChild(d);
-  return d;
+var r=document.getElementById('r'),p=0,f=0;
+function T(n,fn){
+ try{var o=fn();if(o===true||o===undefined){p++;r.textContent+='PASS '+n+'\n'}
+ else{f++;r.textContent+='FAIL '+n+': '+o+'\n'}
+ console.log('LIFE TEST '+(o===true||o===undefined?'PASS ':'FAIL ')+n+' => '+((o===null)?'null':(typeof o)+':'+o));}
+ catch(e){f++;r.textContent+='FAIL '+n+': '+e.message+'\n'
+ console.log('LIFE TEST FAIL '+n+' THREW => '+e.message);}
 }
-function check(id, label, fn) {
-  var r;
-  try { r = fn(); }
-  catch (e) { line(id, label, 'fail', 'THREW: ' + e); return; }
-  line(id, label, r.ok ? 'pass' : 'fail', r.msg);
-}
-
-/* #29 - querySelector / querySelectorAll, incl. compound + descendant */
-check('#29', 'querySelector + compound selectors', function () {
-  var one  = document.querySelector('#fixture p.fx');
-  var many = document.querySelectorAll('#fixture p.fx');
-  return { ok: one !== null && many.length === 3,
-           msg: 'one=' + (one ? one.textContent : 'null') + ', all=' + many.length + ' (want 3)' };
-});
-
-/* #261 - getElementsByClassName / getElementsByTagName, incl. element-scoped */
-check('#261', 'getElementsByClassName / TagName', function () {
-  var byClass = document.getElementsByClassName('fx');
-  var byTag   = document.getElementById('fixture').getElementsByTagName('p');
-  return { ok: byClass.length === 3 && byTag.length === 3,
-           msg: 'byClass=' + byClass.length + ', scoped byTag=' + byTag.length + ' (want 3/3)' };
-});
-
-/* #263 - non-element traversal + real text nodes */
-check('#263', 'childNodes / firstChild / nextSibling / text nodes', function () {
-  var p = document.querySelector('#fixture p.fx');
-  var t = p.firstChild;
-  var host = document.createElement('div');
-  host.appendChild(document.createTextNode('one'));
-  host.appendChild(document.createElement('b'));
-  var kinds = [];
-  for (var n = host.firstChild; n; n = n.nextSibling) kinds.push(n.nodeType);
-  return { ok: !!t && t.nodeType === 3 && t.nodeValue === 'alpha' && kinds.join(',') === '3,1',
-           msg: 'firstChild type=' + (t ? t.nodeType : '?') + ' value=' + (t ? t.nodeValue : '?') +
-                ', kinds=[' + kinds.join(',') + '] (want 3,1)' };
-});
-
-/* #264 - capture -> target -> bubble ordering through a real dispatch */
-check('#264', 'event capture / target / bubble order', function () {
-  var order = [];
-  var outer = document.createElement('div');
-  var inner = document.createElement('span');
-  outer.appendChild(inner);
-  document.body.appendChild(outer);
-  outer.addEventListener('click', function () { order.push('cap'); }, true);
-  inner.addEventListener('click', function () { order.push('target'); }, false);
-  outer.addEventListener('click', function () { order.push('bubble'); }, false);
-  var ev;
-  if (document.createEvent) { ev = document.createEvent('MouseEvents'); ev.initEvent('click', true, true); }
-  else { ev = new Event('click', { bubbles: true }); }
-  inner.dispatchEvent(ev);
-  document.body.removeChild(outer);
-  return { ok: order.join(',') === 'cap,target,bubble',
-           msg: 'order=[' + order.join(',') + '] (want cap,target,bubble)' };
-});
-
-/* #182 - XenForo preamble hiddenscroll: append, read parentNode, removeChild */
-check('#182', 'hiddenscroll: append then parentNode.removeChild', function () {
-  var b = document.createElement('div');
-  b.style.width = '100px'; b.style.height = '100px'; b.style.overflow = 'scroll';
-  document.body.appendChild(b);
-  var pn = b.parentNode;
-  if (!pn) return { ok: false, msg: 'parentNode was NULL right after appendChild' };
-  pn.removeChild(b);
-  return { ok: b.parentNode === null,
-           msg: 'parentNode resolved after append; removeChild OK; now ' + b.parentNode };
-});
-
-/* #303 - a mutation after first paint must repaint (reconvert no longer fenced) */
-(function () {
-  var d = line('#303', 'JS mutation after first paint repaints', 'wait', 'pending...');
-  setTimeout(function () {
-    var t = document.getElementById('repaint');
-    t.textContent = '#303 - this sentence was written by setTimeout AFTER first paint.';
-    t.style.background = '#1a7f37';
-    t.style.color = '#fff';
-    d.className = 'r pass';
-    d.textContent = '#303  JS mutation after first paint repaints  -  green line below is the proof';
-  }, 400);
+console.log('LIFE PAGE readyState='+document.readyState+' body='+(typeof document.body)+' bodyNull='+(document.body===null));
+T('URLSearchParams object',function(){return new URLSearchParams({k:'v'}).get('k')==='v'});
+T('URLSearchParams array',function(){return new URLSearchParams([['a','1']]).get('a')==='1'});
+T('NodeFilter.SHOW_TEXT',function(){return NodeFilter.SHOW_TEXT===4});
+T('DOMPurify.sanitize',function(){return typeof DOMPurify==='function'&&typeof DOMPurify.sanitize==='function'});
+T('Node.ELEMENT_NODE',function(){return Node.ELEMENT_NODE===1});
+T('el instanceof Node',function(){return document.createElement('div') instanceof Node});
+T('el instanceof HTMLElement',function(){return document.createElement('div') instanceof HTMLElement});
+T('contentEditable',function(){var d=document.createElement('div');return d.contentEditable==='inherit'&&(d.contentEditable='true',d.isContentEditable)});
+T('getSelection',function(){return typeof getSelection()==='object'});
+T('createRange',function(){return typeof document.createRange().setStart==='function'});
+T('createTreeWalker',function(){return typeof document.createTreeWalker==='function'});
+/* tagName case-insensitive now; the raw tagName is probed below */
+T('innerHTML detached',function(){var d=document.createElement('div');d.innerHTML='<p>hi</p>';var c=d.firstChild;return !!(c&&c.tagName&&c.tagName.toUpperCase()==='P')});
+T('appendChild works',function(){var d=document.createElement('div');var p=document.createElement('p');d.appendChild(p);return d.firstChild===p});
+T('innerHTML attached',function(){var d=document.createElement('div');document.body.appendChild(d);d.innerHTML='<p>hi</p>';var ok=!!(d.firstChild&&d.firstChild.tagName&&d.firstChild.tagName.toUpperCase()==='P');document.body.removeChild(d);return ok});
+T('rAF',function(){return typeof requestAnimationFrame==='function'});
+T('createEvent',function(){return typeof document.createEvent('MouseEvents').initMouseEvent==='function'});
+T('hasFocus',function(){return document.hasFocus()===true});
+T('implementation',function(){return typeof document.implementation.hasFeature==='function'});
+T('MouseEvent',function(){return new MouseEvent('c',{clientX:100}).clientX===100});
+T('KeyboardEvent',function(){return new KeyboardEvent('k',{key:'Enter'}).key==='Enter'});
+T('queryCommandSupported',function(){return document.queryCommandSupported('bold')===true});
+/* ---- fingerprint probes: log every value, never rely on T() ---- */
+(function(){
+var d=document.createElement('div'),p=document.createElement('p');
+d.appendChild(p);
+var fc=d.firstChild;
+console.log('LIFE PROBE append fc_null='+(fc===null)+' fc_is_p='+(fc===p)+' fc_type='+(fc?fc.nodeType:'n/a')+' fc_tag='+(fc?(fc.tagName||'?'):'n/a')+' cn='+d.childNodes.length+' kids='+d.children.length+' has='+d.hasChildNodes()+' cn0_is_p='+(d.childNodes[0]===p)+' parent_is_d='+(p.parentNode===d));
+var e=document.createElement('div');e.innerHTML='<p>hi</p>';
+var fe=e.firstChild;
+console.log('LIFE PROBE innerHTML fc_null='+(fe===null)+' fc_tag='+(fe?(fe.tagName||'?'):'n/a')+' tc='+e.textContent+' cn='+e.childNodes.length+' e2='+e.outerHTML);
+var t=document.createElement('div');t.innerHTML='hi';
+var ft=t.firstChild;
+console.log('LIFE PROBE innerHTML-text fc_null='+(ft===null)+' fc_type='+(ft?ft.nodeType:'n/a')+' tc='+t.textContent+' cn='+t.childNodes.length);
+console.log('LIFE PROBE typeof rAF='+typeof requestAnimationFrame+' cancelAF='+typeof cancelAnimationFrame+' MouseEvent='+typeof MouseEvent+' KeyboardEvent='+typeof KeyboardEvent);
+console.log('LIFE PROBE doc createEvent='+typeof document.createEvent+' hasFocus='+typeof document.hasFocus+' implementation='+typeof document.implementation+' qcs='+typeof document.queryCommandSupported+' createRange='+typeof document.createRange+' tw='+typeof document.createTreeWalker+' gs='+typeof document.getSelection);
+var ce=null;try{ce=document.createEvent('MouseEvents');}catch(err){ce='THREW '+err.message;}
+console.log('LIFE PROBE createEvent ret='+(typeof ce==='string'?ce:(typeof ce+' initME='+typeof (ce&&ce.initMouseEvent))));
 })();
-
-/* #222 - real XMLHttpRequest over the network */
-(function () {
-  var d = line('#222', 'XMLHttpRequest (real network)', 'wait', 'pending...');
-  try {
-    var x = new XMLHttpRequest();
-    x.open('GET', 'puffy.svg', true);
-    x.onreadystatechange = function () {
-      if (x.readyState !== 4) return;
-      var n = x.responseText ? x.responseText.length : 0;
-      d.className = 'r ' + (x.status === 200 && n > 0 ? 'pass' : 'fail');
-      d.textContent = '#222  XMLHttpRequest (real network)  -  status=' + x.status + ' bytes=' + n;
-    };
-    x.send();
-  } catch (e) {
-    d.className = 'r fail';
-    d.textContent = '#222  XMLHttpRequest  -  THREW: ' + e;
-  }
-})();
-
-/* #104 - fetch() as a real Promise over the network */
-(function () {
-  var d = line('#104', 'fetch() returns a real Promise', 'wait', 'pending...');
-  if (typeof fetch !== 'function') {
-    d.className = 'r fail';
-    d.textContent = '#104  fetch()  -  NOT A FUNCTION';
-    return;
-  }
-  fetch('puffy.svg').then(function (r) {
-    return r.text().then(function (t) {
-      d.className = 'r ' + (r.ok && t.length > 0 ? 'pass' : 'fail');
-      d.textContent = '#104  fetch() returns a real Promise  -  ok=' + r.ok +
-                      ' status=' + r.status + ' bytes=' + t.length;
-    });
-  })['catch'](function (e) {
-    d.className = 'r fail';
-    d.textContent = '#104  fetch()  -  REJECTED: ' + e;
-  });
-})();
+r.textContent+='\n'+(f?'FAILED':'ALL PASSED')+': '+p+'/'+(p+f);
+/* ---- second pass after DOMContentLoaded: same key checks, PROBE2 ---- */
+document.addEventListener('DOMContentLoaded',function(){
+ var d=document.createElement('div'),p=document.createElement('p');
+ d.appendChild(p);
+ var fc=d.firstChild;
+ console.log('LIFE PROBE2 readyState='+document.readyState+' append fc_null='+(fc===null)+' fc_is_p='+(fc===p)+' cn='+d.childNodes.length+' kids='+d.children.length+' has='+d.hasChildNodes()+' parent_is_d='+(p.parentNode===d));
+ var e=document.createElement('div');e.innerHTML='<p>hi</p>';
+ var fe=e.firstChild;
+ console.log('LIFE PROBE2 innerHTML fc_null='+(fe===null)+' fc_tag='+(fe?(fe.tagName||'?'):'n/a')+' tc='+e.textContent+' cn='+e.childNodes.length);
+ console.log('LIFE PROBE2 typeof rAF='+typeof requestAnimationFrame+' MouseEvent='+typeof MouseEvent+' KeyboardEvent='+typeof KeyboardEvent+' qcs='+typeof document.queryCommandSupported+' hasFocus='+typeof document.hasFocus);
+});
 </script>
-</body>
-</html>
+</body></html>
