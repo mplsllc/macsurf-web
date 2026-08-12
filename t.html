@@ -1,65 +1,73 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>Tests</title></head><body>
-<pre id="r"></pre>
-<script>
-var r=document.getElementById('r'),p=0,f=0;
-function T(n,fn){
- try{var o=fn();if(o===true||o===undefined){p++;r.textContent+='PASS '+n+'\n'}
- else{f++;r.textContent+='FAIL '+n+': '+o+'\n'}
- console.log('LIFE TEST '+(o===true||o===undefined?'PASS ':'FAIL ')+n+' => '+((o===null)?'null':(typeof o)+':'+o));}
- catch(e){f++;r.textContent+='FAIL '+n+': '+e.message+'\n'
- console.log('LIFE TEST FAIL '+n+' THREW => '+e.message);}
-}
-console.log('LIFE PAGE readyState='+document.readyState+' body='+(typeof document.body)+' bodyNull='+(document.body===null));
-T('URLSearchParams object',function(){return new URLSearchParams({k:'v'}).get('k')==='v'});
-T('URLSearchParams array',function(){return new URLSearchParams([['a','1']]).get('a')==='1'});
-T('NodeFilter.SHOW_TEXT',function(){return NodeFilter.SHOW_TEXT===4});
-T('DOMPurify.sanitize',function(){return typeof DOMPurify==='object'&&typeof DOMPurify.sanitize==='function'});
-T('Node.ELEMENT_NODE',function(){return Node.ELEMENT_NODE===1});
-T('el instanceof Node',function(){return document.createElement('div') instanceof Node});
-T('el instanceof HTMLElement',function(){return document.createElement('div') instanceof HTMLElement});
-T('contentEditable',function(){var d=document.createElement('div');return d.contentEditable==='inherit'&&(d.contentEditable='true',d.isContentEditable)});
-T('getSelection',function(){return typeof getSelection()==='object'});
-T('createRange',function(){return typeof document.createRange().setStart==='function'});
-T('createTreeWalker',function(){return typeof document.createTreeWalker==='function'});
-/* tagName case-insensitive now; the raw tagName is probed below */
-T('innerHTML detached',function(){var d=document.createElement('div');d.innerHTML='<p>hi</p>';var c=d.firstChild;return !!(c&&c.tagName&&c.tagName.toUpperCase()==='P')});
-T('appendChild works',function(){var d=document.createElement('div');var p=document.createElement('p');d.appendChild(p);return d.firstChild===p});
-T('innerHTML attached',function(){var d=document.createElement('div');document.body.appendChild(d);d.innerHTML='<p>hi</p>';var ok=!!(d.firstChild&&d.firstChild.tagName&&d.firstChild.tagName.toUpperCase()==='P');document.body.removeChild(d);return ok});
-T('rAF',function(){return typeof requestAnimationFrame==='function'});
-T('createEvent',function(){return typeof document.createEvent('MouseEvents').initMouseEvent==='function'});
-T('hasFocus',function(){return document.hasFocus()===true});
-T('implementation',function(){return typeof document.implementation.hasFeature==='function'});
-T('MouseEvent',function(){return new MouseEvent('c',{clientX:100}).clientX===100});
-T('KeyboardEvent',function(){return new KeyboardEvent('k',{key:'Enter'}).key==='Enter'});
-T('queryCommandSupported',function(){return document.queryCommandSupported('bold')===true});
-/* ---- fingerprint probes: log every value, never rely on T() ---- */
-(function(){
-var d=document.createElement('div'),p=document.createElement('p');
-d.appendChild(p);
-var fc=d.firstChild;
-console.log('LIFE PROBE append fc_null='+(fc===null)+' fc_is_p='+(fc===p)+' fc_type='+(fc?fc.nodeType:'n/a')+' fc_tag='+(fc?(fc.tagName||'?'):'n/a')+' cn='+d.childNodes.length+' kids='+d.children.length+' has='+d.hasChildNodes()+' cn0_is_p='+(d.childNodes[0]===p)+' parent_is_d='+(p.parentNode===d));
-var e=document.createElement('div');e.innerHTML='<p>hi</p>';
-var fe=e.firstChild;
-console.log('LIFE PROBE innerHTML fc_null='+(fe===null)+' fc_tag='+(fe?(fe.tagName||'?'):'n/a')+' tc='+e.textContent+' cn='+e.childNodes.length+' e2='+e.outerHTML);
-var t=document.createElement('div');t.innerHTML='hi';
-var ft=t.firstChild;
-console.log('LIFE PROBE innerHTML-text fc_null='+(ft===null)+' fc_type='+(ft?ft.nodeType:'n/a')+' tc='+t.textContent+' cn='+t.childNodes.length);
-console.log('LIFE PROBE typeof rAF='+typeof requestAnimationFrame+' cancelAF='+typeof cancelAnimationFrame+' MouseEvent='+typeof MouseEvent+' KeyboardEvent='+typeof KeyboardEvent);
-console.log('LIFE PROBE doc createEvent='+typeof document.createEvent+' hasFocus='+typeof document.hasFocus+' implementation='+typeof document.implementation+' qcs='+typeof document.queryCommandSupported+' createRange='+typeof document.createRange+' tw='+typeof document.createTreeWalker+' gs='+typeof document.getSelection);
-var ce=null;try{ce=document.createEvent('MouseEvents');}catch(err){ce='THREW '+err.message;}
-console.log('LIFE PROBE createEvent ret='+(typeof ce==='string'?ce:(typeof ce+' initME='+typeof (ce&&ce.initMouseEvent))));
-})();
-r.textContent+='\n'+(f?'FAILED':'ALL PASSED')+': '+p+'/'+(p+f);
-/* ---- second pass after DOMContentLoaded: same key checks, PROBE2 ---- */
-document.addEventListener('DOMContentLoaded',function(){
- var d=document.createElement('div'),p=document.createElement('p');
- d.appendChild(p);
- var fc=d.firstChild;
- console.log('LIFE PROBE2 readyState='+document.readyState+' append fc_null='+(fc===null)+' fc_is_p='+(fc===p)+' cn='+d.childNodes.length+' kids='+d.children.length+' has='+d.hasChildNodes()+' parent_is_d='+(p.parentNode===d));
- var e=document.createElement('div');e.innerHTML='<p>hi</p>';
- var fe=e.firstChild;
- console.log('LIFE PROBE2 innerHTML fc_null='+(fe===null)+' fc_tag='+(fe?(fe.tagName||'?'):'n/a')+' tc='+e.textContent+' cn='+e.childNodes.length);
- console.log('LIFE PROBE2 typeof rAF='+typeof requestAnimationFrame+' MouseEvent='+typeof MouseEvent+' KeyboardEvent='+typeof KeyboardEvent+' qcs='+typeof document.queryCommandSupported+' hasFocus='+typeof document.hasFocus);
-});
-</script>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>calc() tests</title>
+<style>
+body { font: 16px Geneva; margin: 16px; background: #fff; color: #000; }
+h1 { font-size: 20px; margin: 0 0 4px 0; }
+p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
+.row { margin: 0 0 10px 0; clear: both; }
+.lbl { float: left; width: 230px; font-size: 14px; }
+.ref { position: relative; background: #eee; }
+.dim { float: left; background: #4a90d9; color: #fff; text-align: center;
+  font-size: 12px; box-sizing: border-box; }
+.dim2 { float: left; background: #d94a4a; color: #fff; text-align: center;
+  font-size: 12px; }
+/* 1. width: calc(100% - 40px) in a 300px ref -> 260px (baseline) */
+.r1 { width: 300px; height: 60px; }
+.b1 { width: calc(100% - 40px); height: 40px; margin: 10px 0; }
+/* 2. height: calc(120px - 40px) -> 80px */
+.r2 { width: 300px; height: 100px; }
+.b2 { width: 120px; height: calc(120px - 40px); margin: 10px 0; }
+/* 3. margin-left: calc(30px + 10px) -> 40px indent */
+.r3 { width: 300px; height: 60px; }
+.b3 { width: 80px; height: 40px; margin: 10px 0 10px calc(30px + 10px); }
+/* 4. padding: calc(10px + 5px) -> 15px around a 50px core -> 80px box */
+.r4 { width: 300px; height: 100px; }
+.b4 { width: 50px; height: 50px; padding: calc(10px + 5px);
+  margin: 10px 0; background: #eee; }
+.b4c { width: 50px; height: 50px; background: #4a90d9; }
+/* 5. border-width: calc(4px + 2px) -> 6px border */
+.r5 { width: 300px; height: 60px; }
+.b5 { width: 100px; height: 30px; margin: 10px 0;
+  border: calc(4px + 2px) solid #d94a4a; }
+/* 6. letter-spacing: calc(2px + 1px) -> 3px */
+.r6 { width: 400px; height: 40px; }
+.b6 { font-size: 18px; letter-spacing: calc(2px + 1px); padding: 8px 0; }
+.b6n { font-size: 18px; letter-spacing: 0; padding: 8px 0; color: #555; }
+/* 7. max-height: calc(100px - 30px) -> clamps tall content to 70px */
+.r7 { width: 300px; height: 90px; }
+.b7 { width: 120px; max-height: calc(100px - 30px); overflow: hidden;
+  margin: 10px 0; }
+.b7c { width: 120px; height: 150px; background: #4a90d9; }
+/* 8. min-height: calc(40px + 20px) -> 60px floor */
+.r8 { width: 300px; height: 80px; }
+.b8 { width: 120px; min-height: calc(40px + 20px); margin: 10px 0; }
+</style></head><body>
+<h1>fixes1159: CSS calc() resolution</h1>
+<p class="note">Each row: the blue/red box must match the EXPECTED size printed in its
+label. Before the fix, every case except #1 collapses to 0 (no margin, no padding,
+no border, zero height). Compare against a desktop browser.</p>
+
+<div class="row"><span class="lbl">1. width: calc(100% - 40px)<br>EXPECT 260px wide</span>
+<div class="ref r1"><div class="dim b1">260</div></div></div>
+
+<div class="row"><span class="lbl">2. height: calc(120px - 40px)<br>EXPECT 80px tall</span>
+<div class="ref r2"><div class="dim b2">80</div></div></div>
+
+<div class="row"><span class="lbl">3. margin-left: calc(30px + 10px)<br>EXPECT 40px from left edge</span>
+<div class="ref r3"><div class="dim b3">40px</div></div></div>
+
+<div class="row"><span class="lbl">4. padding: calc(10px + 5px)<br>EXPECT grey box 80x80<br>(15px padding around 50px core)</span>
+<div class="ref r4"><div class="b4"><div class="b4c"></div></div></div></div>
+
+<div class="row"><span class="lbl">5. border-width: calc(4px + 2px)<br>EXPECT 6px red border</span>
+<div class="ref r5"><div class="b5"></div></div></div>
+
+<div class="row"><span class="lbl">6. letter-spacing: calc(2px + 1px)<br>EXPECT spaced-out text (3px)<br>vs normal text below</span>
+<div class="ref r6"><div class="b6">SPACED TEXT</div><div class="b6n">NORMAL TEXT</div></div></div>
+
+<div class="row"><span class="lbl">7. max-height: calc(100px - 30px)<br>EXPECT blue clipped at 70px</span>
+<div class="ref r7"><div class="b7"><div class="b7c"></div></div></div></div>
+
+<div class="row"><span class="lbl">8. min-height: calc(40px + 20px)<br>EXPECT 60px tall (empty box)</span>
+<div class="ref r8"><div class="dim b8">60</div></div></div>
+
 </body></html>
