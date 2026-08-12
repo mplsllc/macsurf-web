@@ -13,7 +13,7 @@ console.log('LIFE PAGE readyState='+document.readyState+' body='+(typeof documen
 T('URLSearchParams object',function(){return new URLSearchParams({k:'v'}).get('k')==='v'});
 T('URLSearchParams array',function(){return new URLSearchParams([['a','1']]).get('a')==='1'});
 T('NodeFilter.SHOW_TEXT',function(){return NodeFilter.SHOW_TEXT===4});
-T('DOMPurify.sanitize',function(){return typeof DOMPurify==='function'&&typeof DOMPurify.sanitize==='function'});
+T('DOMPurify.sanitize',function(){return typeof DOMPurify==='object'&&typeof DOMPurify.sanitize==='function'});
 T('Node.ELEMENT_NODE',function(){return Node.ELEMENT_NODE===1});
 T('el instanceof Node',function(){return document.createElement('div') instanceof Node});
 T('el instanceof HTMLElement',function(){return document.createElement('div') instanceof HTMLElement});
