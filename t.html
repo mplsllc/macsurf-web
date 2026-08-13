@@ -1,7 +1,8 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>calc() tests</title>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>calc() + row-gap tests</title>
 <style>
 body { font: 16px Geneva; margin: 16px; background: #fff; color: #000; }
-h1 { font-size: 20px; margin: 0 0 4px 0; }
+h1 { font-size: 20px; margin: 20px 0 4px 0; }
+h1:first-of-type { margin-top: 0; }
 p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
 .row { margin: 0 0 10px 0; clear: both; }
 .lbl { float: left; width: 230px; font-size: 14px; }
@@ -40,8 +41,25 @@ p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
 /* 8. min-height: calc(40px + 20px) -> 60px floor */
 .r8 { width: 300px; height: 80px; }
 .b8 { width: 120px; min-height: calc(40px + 20px); margin: 10px 0; }
+
+/* 9. flex-wrap: row-gap (vertical, between wrapped lines) must differ
+ * from column-gap (horizontal, between items on a line). Before
+ * fixes1161 both aliased to column-gap, so the rows below would be
+ * touching (5px) instead of 20px apart. */
+.f9 { display: flex; flex-wrap: wrap; width: 210px;
+  row-gap: 20px; column-gap: 5px; background: #eee; }
+.f9 div { width: 100px; height: 30px; background: #4a90d9; color: #fff;
+  text-align: center; font-size: 12px; line-height: 30px; }
+
+/* 10. grid: two-value `gap: ROW COL` -- before fixes1161 the row
+ * value (20px) was silently discarded and only the column value (5px)
+ * applied to both axes. */
+.g10 { display: grid; grid-template-columns: 100px 100px;
+  gap: 20px 5px; background: #eee; width: 205px; }
+.g10 div { height: 30px; background: #d94a4a; color: #fff;
+  text-align: center; font-size: 12px; line-height: 30px; }
 </style></head><body>
-<h1>fixes1159: CSS calc() resolution</h1>
+<h1>fixes1159/1184/1185: CSS calc() resolution</h1>
 <p class="note">Each row: the blue/red box must match the EXPECTED size printed in its
 label. Before the fix, every case except #1 collapses to 0 (no margin, no padding,
 no border, zero height). Compare against a desktop browser.</p>
@@ -69,5 +87,17 @@ no border, zero height). Compare against a desktop browser.</p>
 
 <div class="row"><span class="lbl">8. min-height: calc(40px + 20px)<br>EXPECT 60px tall (empty box)</span>
 <div class="ref r8"><div class="dim b8">60</div></div></div>
+
+<h1>fixes1161: CSS row-gap as an independent property</h1>
+<p class="note">Before the fix, row-gap silently aliased to column-gap.
+Compare against a desktop browser.</p>
+
+<div class="row"><span class="lbl">9. flex-wrap: row-gap 20px, column-gap 5px<br>
+EXPECT wide gap between rows, narrow gap<br>between the two side-by-side boxes</span>
+<div class="f9"><div>a</div><div>b</div><div>c</div></div></div>
+
+<div class="row"><span class="lbl">10. grid: gap: 20px 5px (row col)<br>
+EXPECT wide gap between rows, narrow gap<br>between columns</span>
+<div class="g10"><div>1</div><div>2</div><div>3</div><div>4</div></div></div>
 
 </body></html>
