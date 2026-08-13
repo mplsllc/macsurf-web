@@ -3,8 +3,8 @@
 body { font: 16px Geneva; margin: 16px; background: #fff; color: #000; }
 h1 { font-size: 20px; margin: 0 0 4px 0; }
 p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
-.row { margin: 0 0 10px 0; clear: both; }
-.lbl { float: left; width: 230px; font-size: 14px; }
+.test { margin: 0 0 20px 0; }
+.lbl { font-size: 14px; margin: 0 0 6px 0; }
 
 /* 1. flex-wrap: row-gap (vertical, between wrapped lines) must differ
  * from column-gap (horizontal, between items on a line). Before
@@ -27,12 +27,16 @@ p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
 <p class="note">Before the fix, row-gap silently aliased to column-gap.
 Compare against a desktop browser.</p>
 
-<div class="row"><span class="lbl">1. flex-wrap: row-gap 20px, column-gap 5px<br>
-EXPECT wide gap between rows, narrow gap<br>between the two side-by-side boxes</span>
-<div class="f9"><div>a</div><div>b</div><div>c</div></div></div>
+<div class="test">
+<div class="lbl">1. flex-wrap: row-gap 20px, column-gap 5px.
+EXPECT wide gap between rows, narrow gap between the two side-by-side boxes.</div>
+<div class="f9"><div>a</div><div>b</div><div>c</div></div>
+</div>
 
-<div class="row"><span class="lbl">2. grid: gap: 20px 5px (row col)<br>
-EXPECT wide gap between rows, narrow gap<br>between columns</span>
-<div class="g10"><div>1</div><div>2</div><div>3</div><div>4</div></div></div>
+<div class="test">
+<div class="lbl">2. grid: gap: 20px 5px (row col).
+EXPECT wide gap between rows, narrow gap between columns.</div>
+<div class="g10"><div>1</div><div>2</div><div>3</div><div>4</div></div>
+</div>
 
 </body></html>
