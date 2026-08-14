@@ -1,42 +1,60 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><title>row-gap tests</title>
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>min/max/clamp tests</title>
 <style>
 body { font: 16px Geneva; margin: 16px; background: #fff; color: #000; }
 h1 { font-size: 20px; margin: 0 0 4px 0; }
 p.note { font-size: 13px; color: #555; margin: 0 0 12px 0; }
-.test { margin: 0 0 20px 0; }
+.test { margin: 0 0 16px 0; }
 .lbl { font-size: 14px; margin: 0 0 6px 0; }
+.ref { background: #eee; width: 300px; }
+.bar { background: #4a90d9; color: #fff; text-align: center;
+  font-size: 12px; height: 24px; line-height: 24px; }
 
-/* 1. flex-wrap: row-gap (vertical, between wrapped lines) must differ
- * from column-gap (horizontal, between items on a line). Before
- * fixes1161 both aliased to column-gap, so the rows below would be
- * touching (5px) instead of 20px apart. */
-.f9 { display: flex; flex-wrap: wrap; width: 210px;
-  row-gap: 20px; column-gap: 5px; background: #eee; }
-.f9 div { width: 100px; height: 30px; background: #4a90d9; color: #fff;
-  text-align: center; font-size: 12px; line-height: 30px; }
-
-/* 2. grid: two-value `gap: ROW COL` -- before fixes1161 the row
- * value (20px) was silently discarded and only the column value (5px)
- * applied to both axes. */
-.g10 { display: grid; grid-template-columns: 100px 100px;
-  gap: 20px 5px; background: #eee; width: 205px; }
-.g10 div { height: 30px; background: #d94a4a; color: #fff;
-  text-align: center; font-size: 12px; line-height: 30px; }
+/* 1. width: min(300px, 150px) -> the smaller of the two: 150px */
+.b1 { width: min(300px, 150px); }
+/* 2. width: max(50px, 150px) -> the larger of the two: 150px */
+.b2 { width: max(50px, 150px); }
+/* 3. width: clamp(100px, 50px, 300px) -> value (50) is below the floor
+ * (100), so clamps UP to 100px */
+.b3 { width: clamp(100px, 50px, 300px); }
+/* 4. width: clamp(100px, 500px, 300px) -> value (500) is above the
+ * ceiling (300), so clamps DOWN to 300px */
+.b4 { width: clamp(100px, 500px, 300px); }
+/* 5. width: clamp(100px, 200px, 300px) -> value (200) is already
+ * inside the range, passes through unchanged */
+.b5 { width: clamp(100px, 200px, 300px); }
+/* 6. width: min(100%, 150px) inside a 300px reference -> 100% of 300
+ * is 300, which is larger than 150, so min() picks 150px */
+.b6 { width: min(100%, 150px); }
+/* 7. font-size: clamp(16px, 4vw, 40px) -- fluid typography. Resizes
+ * with the window; must never go below 16px or above 40px. */
+.big { font-size: clamp(16px, 4vw, 40px); }
+.ref-text { font-size: 16px; color: #555; }
 </style></head><body>
-<h1>fixes1161: CSS row-gap as an independent property</h1>
-<p class="note">Before the fix, row-gap silently aliased to column-gap.
-Compare against a desktop browser.</p>
+<h1>fixes1166: CSS min(), max(), clamp() math functions</h1>
+<p class="note">Each bar's width in px should match the EXPECT label. Before the
+fix these silently dropped to 0 width. Compare against a desktop browser.</p>
 
-<div class="test">
-<div class="lbl">1. flex-wrap: row-gap 20px, column-gap 5px.
-EXPECT wide gap between rows, narrow gap between the two side-by-side boxes.</div>
-<div class="f9"><div>a</div><div>b</div><div>c</div></div>
-</div>
+<div class="test"><div class="lbl">1. width: min(300px, 150px) -- EXPECT 150px</div>
+<div class="ref"><div class="bar b1">150</div></div></div>
 
-<div class="test">
-<div class="lbl">2. grid: gap: 20px 5px (row col).
-EXPECT wide gap between rows, narrow gap between columns.</div>
-<div class="g10"><div>1</div><div>2</div><div>3</div><div>4</div></div>
-</div>
+<div class="test"><div class="lbl">2. width: max(50px, 150px) -- EXPECT 150px</div>
+<div class="ref"><div class="bar b2">150</div></div></div>
+
+<div class="test"><div class="lbl">3. width: clamp(100px, 50px, 300px) -- EXPECT 100px (clamped up from 50)</div>
+<div class="ref"><div class="bar b3">100</div></div></div>
+
+<div class="test"><div class="lbl">4. width: clamp(100px, 500px, 300px) -- EXPECT 300px (clamped down from 500)</div>
+<div class="ref"><div class="bar b4">300</div></div></div>
+
+<div class="test"><div class="lbl">5. width: clamp(100px, 200px, 300px) -- EXPECT 200px (in range, unchanged)</div>
+<div class="ref"><div class="bar b5">200</div></div></div>
+
+<div class="test"><div class="lbl">6. width: min(100%, 150px) in a 300px reference -- EXPECT 150px</div>
+<div class="ref"><div class="bar b6">150</div></div></div>
+
+<div class="test"><div class="lbl">7. font-size: clamp(16px, 4vw, 40px) -- fluid text, resize the window to test<br>
+EXPECT larger than the 16px reference below, and it should stop growing once it hits 40px</div>
+<div class="big">CLAMP TEXT</div>
+<div class="ref-text">16px reference text</div></div>
 
 </body></html>
